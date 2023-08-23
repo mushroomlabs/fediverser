@@ -1,0 +1,88 @@
+variables:
+  DJANGO_SETTINGS_MODULE: "fediverser.admin.settings"
+  FEDIVERSER_BROKER_URL: "redis://redis:6379/0"
+  FEDIVERSER_CACHE_BACKEND: "django_redis.cache.RedisCache"
+  FEDIVERSER_CACHE_LOCATION: "redis://redis:6379/1"
+  FEDIVERSER_CHANNEL_LAYER_HOST: "redis"
+  FEDIVERSER_DATABASE_NAME: "fediverser_ci"
+  FEDIVERSER_DATABASE_USER: "fediverser"
+  FEDIVERSER_DATABASE_PASSWORD: "fediverser_pass"
+  FEDIVERSER_DATABASE_HOST: "postgres"
+  FEDIVERSER_DATABASE_PORT: "5432"
+  FEDIVERSER_EMAIL_MAILER_ADDRESS: "noreply@gitlab.example.com"
+  FEDIVERSER_MEDIA_ROOT: "/var/fediverser/media"
+  FEDIVERSER_STATIC_ROOT: "/var/fediverser/static"
+  FEDIVERSER_SECRET_KEY: "base-fediverser-secret-key"
+  LEMMY_DATABASE_ENGINE: "django.db.backends.sqlite3"
+  LEMMY_DATABASE_NAME: ":memory:"
+
+cache:
+  paths:
+  - ~/.cache/pip/
+
+
+stages:
+  - test
+  - build
+  - release
+
+test:
+  image: python:3.11
+  stage: test
+  services:
+    - postgres:latest
+    - redis:latest
+
+  variables:
+    POSTGRES_DB: "$FEDIVERSER_DATABASE_NAME"
+    POSTGRES_USER: "$FEDIVERSER_DATABASE_USER"
+    POSTGRES_PASSWORD: "$FEDIVERSER_DATABASE_PASSWORD"
+
+  script:
+    - export
+    - pip install -e .
+    - pytest
+
+
+build_python_package:
+  image: python:3.11
+  stage: build
+
+  script:
+    - pip install poetry
+    - poetry build
+
+  artifacts:
+    paths:
+      - dist/
+
+
+publish_python_package:
+  image: python:3.11
+  stage: release
+
+  script:
+    - poetry config pypi-token.pypi $PYPI_TOKEN
+    - poetry publish
+
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+$/'
+
+build_docker_image:
+  image: docker:20
+  stage: release
+  services:
+    - docker:20-dind
+
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+
+  script:
+    - DOCKER_TAG=${CI_COMMIT_TAG:-latest}
+    - echo "Building and publishing ${CI_REGISTRY_IMAGE}:${DOCKER_TAG}"
+    - docker build --pull --target fediverser_base -t "${CI_REGISTRY_IMAGE}" .
+    - docker push "${CI_REGISTRY_IMAGE}:${DOCKER_TAG}"
+
+  only:
+    - master
+    - tags

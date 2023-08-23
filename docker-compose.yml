@@ -1,0 +1,162 @@
+version: '3.7'
+
+x-developer: &fediverser_development
+  user: "${UID:-1000}:${GID:-1000}"
+
+x-fediverser: &fediverser_service
+  <<: *fediverser_development
+  stdin_open: true
+  tty: true
+  image: "fediverser/app:${TAG:-latest}"
+  build:
+    context: .
+  restart: unless-stopped
+  depends_on: &fediverser_service_dependencies
+    - redis
+    - db
+
+  environment: &fediverser_web_envvars
+    DJANGO_SETTINGS_MODULE: fediverser.admin.settings
+    FEDIVERSER_STATIC_ROOT: /var/fediverser/static
+    FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
+    FEDIVERSER_BROKER_URL: redis://redis:6379/1
+    FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
+    FEDIVERSER_CACHE_LOCATION: redis://redis:6379/0
+    FEDIVERSER_CORS_HEADERS_ENABLED: 1
+    FEDIVERSER_DATABASE_HOST: db
+    FEDIVERSER_DATABASE_PORT: 5432
+    FEDIVERSER_DATABASE_NAME: fediverser
+    FEDIVERSER_DATABASE_USER: fediverser
+    FEDIVERSER_DATABASE_PASSWORD: fediverser
+    LEMMY_DATABASE_HOST: lemmy-db
+    LEMMY_DATABASE_PORT: 5432
+    LEMMY_DATABASE_NAME: lemmy
+    LEMMY_DATABASE_USER: lemmy
+    LEMMY_DATABASE_PASSWORD: lemmy
+    FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@fediverser.example.com
+    FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+    FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
+    FEDIVERSER_LEMMY_MIRROR_INSTANCE: fediverser.example.com
+    FEDIVERSER_DEBUG: 1
+
+  env_file:
+    - .env
+
+  volumes:
+    - "${FEDIVERSER_APP_MOUNT_PATH:-./}:/app"
+    - "${FEDIVERSER_STATIC_MOUNT_PATH:-./docker/volumes/media/fediverser/static}:/var/fediverser/static"
+    - "${FEDIVERSER_MEDIA_MOUNT_PATH:-./docker/volumes/media/fediverser/media}:/var/fediverser/media"
+
+services:
+  db:
+    <<: *fediverser_development
+    image: "postgres:${FEDIVERSER_POSTGRES_SERVER_VERSION:-latest}"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fediverser
+      POSTGRES_PASSWORD: fediverser
+      POSTGRES_DB: fediverser
+    volumes:
+      - "${FEDIVERSER_DATABASE_MOUNT_PATH:-./docker/volumes/database/fediverser}:/var/lib/postgresql/data"
+
+  redis:
+    <<: *fediverser_development
+    image: redis:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+
+
+  admin:
+    <<: *fediverser_service
+    command: poetry run uvicorn fediverser.admin.asgi:application --port 80 --host 0.0.0.0  --reload --reload-dir /app/fediverser
+    ports:
+      - "8000:80"
+
+  celery:
+    <<: *fediverser_service
+    command: poetry run celery -A fediverser.admin worker -l INFO -E
+
+  celerybeat:
+    <<: *fediverser_service
+    command: poetry run celery -A fediverser.admin beat -l INFO -S django
+
+  init_migrate_db:
+    <<: *fediverser_service
+    command: poetry run django-admin migrate
+    restart: on-failure
+
+  init_collect_media:
+    <<: *fediverser_service
+    command: poetry run django-admin collectstatic --no-input
+    restart: on-failure
+
+  lemmy:
+    <<: *fediverser_development
+    image: dessalines/lemmy:0.18.4
+    environment:
+      - RUST_LOG="warn,lemmy_server=info,lemmy_api=info,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info,lemmy_websocket=info"
+    volumes:
+      - "${FEDIVERSER_LEMMY_BACKEND_CONFIG_MOUNT_PATH:-./docker/volumes/lemmy}:/config/"
+    depends_on:
+      - lemmy-db
+      - lemmy-pictrs
+    ports:
+      - "8536:8536"
+
+  lemmy-ui:
+    <<: *fediverser_development
+    image: dessalines/lemmy-ui:0.18.4
+    restart: always
+    environment:
+      - LEMMY_UI_LEMMY_INTERNAL_HOST=lemmy:8536
+    volumes:
+      - "${FEDIVERSER_LEMMY_UI_MOUNT_PATH:-../docker/volumes/lemmy-ui/extra_themes}:/app/extra_themes"
+    depends_on:
+      - lemmy
+    ports:
+      - "1234:1234"
+
+  lemmy-db:
+    <<: *fediverser_development
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=lemmy
+      - POSTGRES_PASSWORD=lemmy
+      - POSTGRES_DB=lemmy
+    volumes:
+      - "${FEDIVERSER_LEMMY_DATABASE_MOUNT_PATH:-./docker/volumes/lemmy-db}:/var/lib/postgresql/data"
+    restart: always
+
+  lemmy-pictrs:
+    image: asonix/pictrs:0.4.0-rc.3
+    user: 991:991
+    environment:
+      PICTRS__API_KEY: pictrs_pass
+      RUST_BACKTRACE: full
+      PICTRS__MEDIA__VIDEO_CODEC: vp9
+      PICTRS__MEDIA__GIF__MAX_WIDTH: 1920
+      PICTRS__MEDIA__GIF__MAX_HEIGHT: 1080
+      PICTRS__MEDIA__GIF__MAX_FRAME_COUNT: 200
+      PICTRS__STORE__TYPE: object_storage
+      PICTRS__STORE__ENDPOINT: "http://lemmy-minio:9000"
+      PICTRS__STORE__BUCKET_NAME: "lemmy_media"
+      PICTRS__STORE__REGION: "us-east-1"
+      PICTRS__STORE__USE_PATH_STYLE: "true"
+      PICTRS__STORE__ACCESS_KEY: minio_user
+      PICTRS__STORE__SECRET_KEY: minio_pass
+
+    restart: always
+
+  lemmy-minio:
+    <<: *fediverser_development
+    image: minio/minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_pass
+    volumes:
+      - "${FEDIVERSER_LEMMY_MEDIA_MOUNT_PATH:-./docker/volumes/lemmy-media}:/data"

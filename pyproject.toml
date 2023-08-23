@@ -1,0 +1,71 @@
+[tool.black]
+line-length = 99
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.tox
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+py_version = 310
+line_length = 99
+default_section = "THIRDPARTY"
+combine_as_imports = true
+order_by_type = true
+profile = "black"
+
+[tool.poetry]
+name = "fediverser"
+version = "0.2.0"
+description = "Tools to help bring content from legacy networks to the Fediverse"
+authors = ["Raphael Lullis <raphael@mushroomlabs.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+praw = "^7.7.1"
+feedparser = "^6.0.10"
+click = "^8.1.6"
+python-dotenv = "^1.0.0"
+pythorhead = "^0.15.5"
+readability-lxml = "^0.8.1"
+requests = "^2.31.0"
+langdetect = "^1.0.9"
+markdownify = "^0.11.6"
+django = "^4.2.4"
+django-environ = "^0.10.0"
+celery = "^5.3.1"
+uvicorn = "^0.23.2"
+django-celery-beat = "^2.5.0"
+psycopg2-binary = "^2.9.7"
+redis = "^5.0.0"
+requests-cache = "^1.1.0"
+factory-boy = "^3.3.0"
+pytest = "^7.4.0"
+pytest-env = "^1.0.1"
+pytest-django = "^4.5.2"
+django-redis = "^5.3.0"
+django-extensions = "^3.2.3"
+django-model-utils = "^4.3.1"
+django-celery-results = "^2.5.1"
+bcrypt = "^4.0.1"
+pycryptodome = "^3.18.0"
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.14.0"
+black = "^23.7.0"
+isort = "^5.12.0"
+flake8 = "^6.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+echo_subreddit = "fediverser.cli:subreddit_to_lemmy"

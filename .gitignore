@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+
+# configuration files
+.env
+.env.*
+
+# Docker context data
+.docker
+
+# IDEs and OS files
+.idea
+.vscode
+.DS_Store
