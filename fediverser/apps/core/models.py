@@ -148,6 +148,7 @@ class RedditSubmission(TimeStampedModel):
                 removed=post.removed_by is not None,
                 over_18=post.over_18,
             )
+            post.comments.replace_more(limit=None)
             for comment in post.comments:
                 RedditComment.make(submission=submission, comment=comment)
         except DataError:
