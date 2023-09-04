@@ -15,6 +15,10 @@ DEBUG = env.bool("FEDIVERSER_DEBUG", default=False)
 
 ALLOWED_HOSTS = ["*"]
 
+CSRF_TRUSTED_ORIGINS = [
+    it for it in env.str("FEDIVERSER_CSRF_TRUSTED_ORIGINS", default="").split(",") if it
+]
+
 # Application definition
 DJANGO_APPS = (
     "django.contrib.admin",
