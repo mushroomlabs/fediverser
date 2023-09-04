@@ -27,17 +27,25 @@ class LemmyCommunityAdmin(admin.ModelAdmin):
 @admin.register(models.RedditCommunity)
 class RedditCommunityAdmin(admin.ModelAdmin):
     list_display = ("name",)
+    search_fields = ("name",)
 
 
 @admin.register(models.RedditAccount)
 class RedditAccountAdmin(admin.ModelAdmin):
     list_display = ("username",)
     search_fields = ("username",)
+    actions = ("create_lemmy_mirror",)
+
+    @admin.action(description="Create account on Lemmy Mirror Instance")
+    def create_lemmy_mirror(self, request, queryset):
+        for account in queryset:
+            account.register_mirror()
 
 
 @admin.register(models.RedditToLemmyCommunity)
 class RedditToLemmyCommunityAdmin(admin.ModelAdmin):
     list_display = ("subreddit", "lemmy_community")
+    autocomplete_fields = ("subreddit", "lemmy_community")
 
 
 @admin.register(models.RedditSubmission)
@@ -63,6 +71,13 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
         "archived",
     )
     search_fields = ("title",)
+
+    actions = ("post_to_lemmy",)
+
+    @admin.action(description="Post to on Mirror Communities")
+    def post_to_lemmy(self, request, queryset):
+        for post in queryset:
+            post.make_mirror()
 
 
 @admin.register(models.RedditComment)

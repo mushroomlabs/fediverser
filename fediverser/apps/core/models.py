@@ -3,33 +3,48 @@ import logging
 import secrets
 from typing import Optional
 
+import bcrypt
 import praw
+from Crypto.PublicKey import RSA
 from django.conf import settings
 from django.db import models
 from django.db.models import Max
 from django.db.utils import DataError
+from django.utils import timezone
 from django.utils.timezone import make_aware
 from langdetect import detect
 from model_utils.models import TimeStampedModel
 from praw import Reddit
-from pythorhead import Lemmy
+from pythorhead.types import LanguageType
+
+from fediverser.apps.lemmy import models as lemmy_models
 
 logger = logging.getLogger(__name__)
+
+
+LEMMY_CLIENTS = {}
 
 
 def make_password():
     return secrets.token_urlsafe(30)
 
 
+def generate_rsa_keypair(keysize: int = 2048):
+    key = RSA.generate(keysize)
+    public_key_pem = key.publickey().export_key().decode()
+    private_key_pem = key.export_key().decode()
+
+    return (private_key_pem, public_key_pem)
+
+
+def get_hashed_password(cleartext: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed_bytes = bcrypt.hashpw(cleartext.encode(), salt=salt)
+    return hashed_bytes.decode()
+
+
 class LemmyInstance(models.Model):
     domain = models.CharField(max_length=255, unique=True)
-
-    @staticmethod
-    def get_reddit_mirror():
-        return LemmyInstance.objects.get(domain=settings.LEMMY_MIRROR_INSTANCE_DOMAIN)
-
-    def _get_client(self):
-        return Lemmy(f"https://{self.domain}")
 
     def __str__(self):
         return self.domain
@@ -43,7 +58,19 @@ class LemmyCommunity(models.Model):
 
     @property
     def fqdn(self):
-        return f"!{self.name}@{self.instance.domain}"
+        return f"{self.name}@{self.instance.domain}"
+
+    @property
+    def languages(self):
+        return [
+            LanguageType(language_id)
+            for language_id in (
+                lemmy_models.Language.objects.filter(
+                    communitylanguage__community__name=self.name,
+                    communitylanguage__community__instance__domain=self.instance.domain,
+                ).values_list("id", flat=True)
+            )
+        ]
 
     def __str__(self):
         return self.fqdn
@@ -85,6 +112,50 @@ class RedditAccount(models.Model):
         max_length=64, default=make_password, help_text="Password for Lemmy mirror instance"
     )
 
+    def register_mirror(self):
+        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        private_key, public_key = generate_rsa_keypair()
+
+        person, _ = lemmy_models.Person.objects.get_or_create(
+            name=self.username,
+            instance=lemmy_mirror,
+            defaults={
+                "actor_id": f"https://{lemmy_mirror.domain}/u/{self.username}",
+                "inbox_url": f"https://{lemmy_mirror.domain}/u/{self.username}/inbox",
+                "shared_inbox_url": f"https://{lemmy_mirror.domain}/inbox",
+                "private_key": private_key,
+                "public_key": public_key,
+                "published": timezone.now(),
+                "last_refreshed_at": timezone.now(),
+                "local": True,
+                "bot_account": True,
+                "deleted": False,
+                "banned": False,
+                "admin": False,
+            },
+        )
+        local_user, _ = lemmy_models.LocalUser.objects.update_or_create(
+            person=person,
+            defaults={
+                "password_encrypted": get_hashed_password(self.password),
+                "accepted_application": True,
+            },
+        )
+
+    def make_lemmy_client(self):
+        global LEMMY_CLIENTS
+
+        if self.username in LEMMY_CLIENTS:
+            return LEMMY_CLIENTS[self.username]
+
+        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+
+        lemmy_client = lemmy_mirror._get_client()
+        lemmy_client.log_in(self.username, self.password)
+        LEMMY_CLIENTS[self.username] = lemmy_client
+
+        return lemmy_client
+
     @classmethod
     def make(cls, redditor: praw.models.Redditor):
         if redditor is None:
@@ -117,13 +188,57 @@ class RedditSubmission(TimeStampedModel):
     over_18 = models.BooleanField(default=False)
 
     @property
+    def has_self_text(self):
+        return self.selftext is not None and self.selftext.strip()
+
+    @property
     def is_self_post(self):
-        return self.url.startswith("https://reddit.com")
+        return self.url.startswith("https://reddit.com") or self.has_self_text
 
     @property
     def language_code(self):
         text = self.title if not self.is_self_post else f"{self.title}\n {self.selftext}"
         return detect(text)
+
+    def make_mirror(self):
+        for lemmy_community in LemmyCommunity.objects.filter(
+            reddittolemmycommunity__subreddit=self.subreddit
+        ):
+            mirrored_post = LemmyMirroredPost.objects.filter(
+                reddit_submission=self, lemmy_community=lemmy_community
+            ).first()
+            if mirrored_post is None:
+                lemmy_client = self.author.make_lemmy_client()
+                community_id = lemmy_client.discover_community(lemmy_community.fqdn)
+                try:
+                    language = LanguageType[self.language_code.upper()]
+                except (KeyError, ValueError):
+                    language = LanguageType.UNDETERMINED
+
+                params = dict(
+                    community_id=community_id,
+                    name=self.title,
+                    nsfw=self.over_18,
+                    language_id=language.value,
+                )
+                if self.is_self_post:
+                    params["body"] = self.selftext
+                else:
+                    params["url"] = self.url
+
+                lemmy_post = lemmy_client.post.create(**params)
+                mirrored_post = LemmyMirroredPost.objects.create(
+                    reddit_submission=self,
+                    lemmy_post_id=lemmy_post["post_view"]["post"]["id"],
+                    lemmy_community=lemmy_community,
+                )
+            for reddit_comment in self.comments.filter(parent=None).select_related("author"):
+                mirrored_comment = mirrored_post.comments.filter(
+                    reddit_comment=reddit_comment
+                ).first()
+
+                if mirrored_comment is None:
+                    mirrored_comment = reddit_comment.make_mirror(mirrored_post)
 
     @classmethod
     def make(cls, subreddit: RedditCommunity, post: praw.models.Submission):
@@ -183,6 +298,39 @@ class RedditComment(TimeStampedModel):
     @property
     def language_code(self):
         return self.body and detect(self.body)
+
+    def make_mirror(self, mirrored_post, lemmy_parent_id=None):
+        lemmy_client = self.author.make_lemmy_client()
+        try:
+            language = LanguageType[self.language_code.upper()]
+            assert language in mirrored_post.lemmy_community.languages
+        except (KeyError, ValueError, AssertionError, AttributeError):
+            language = LanguageType.UNDETERMINED
+
+        params = dict(
+            post_id=mirrored_post.lemmy_post_id,
+            content=self.body,
+            language_id=language.value,
+            parent_id=lemmy_parent_id,
+        )
+
+        lemmy_comment = lemmy_client.comment.create(**params)
+
+        if lemmy_comment is None:
+            raise ValueError("Failed to create comment")
+
+        new_comment_id = lemmy_comment["comment_view"]["comment"]["id"]
+
+        mirrored_comment = LemmyMirroredComment.objects.create(
+            lemmy_mirrored_post=mirrored_post,
+            reddit_comment=self,
+            lemmy_comment_id=new_comment_id,
+        )
+
+        for reply in self.children.all():
+            reply.make_mirror(mirrored_post, lemmy_parent_id=new_comment_id)
+
+        return mirrored_comment
 
     def __str__(self):
         return self.permalink

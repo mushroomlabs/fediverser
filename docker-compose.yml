@@ -36,7 +36,6 @@ x-fediverser: &fediverser_service
     FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@fediverser.example.com
     FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
-    FEDIVERSER_LEMMY_MIRROR_INSTANCE: fediverser.example.com
     FEDIVERSER_DEBUG: 1
 
   env_file:
@@ -150,6 +149,19 @@ services:
       PICTRS__STORE__SECRET_KEY: minio_pass
 
     restart: always
+
+  lemmy-proxy:
+    image: nginx:1-alpine
+    ports:
+      - "8888:80"
+    volumes:
+      - "${FEDIVERSER_LEMMY_NGINX_CONFIG_MOUNT_PATH:-./docker/volumes/lemmy/nginx}:/etc/nginx/:ro"
+
+    depends_on:
+      - lemmy
+      - lemmy-ui
+      - lemmy-db
+      - lemmy-pictrs
 
   lemmy-minio:
     <<: *fediverser_development

@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from pythorhead import Lemmy
 
 
 class DieselSchemaMigrations(models.Model):
@@ -328,6 +330,13 @@ class Instance(models.Model):
 
     def __str__(self):
         return self.domain
+
+    def _get_client(self):
+        return Lemmy(f"https://{self.domain}")
+
+    @classmethod
+    def get_reddit_mirror(cls):
+        return cls.objects.get(domain=settings.LEMMY_MIRROR_INSTANCE_DOMAIN)
 
     class Meta:
         managed = False
