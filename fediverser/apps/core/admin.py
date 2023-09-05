@@ -72,7 +72,14 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
     )
     search_fields = ("title",)
 
-    actions = ("post_to_lemmy",)
+    actions = ("fetch_from_reddit", "post_to_lemmy")
+
+    @admin.action(description="Fetch data from Reddit")
+    def fetch_from_reddit(self, request, queryset):
+        for reddit_submission in queryset:
+            models.RedditSubmission.make(
+                subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
+            )
 
     @admin.action(description="Post to on Mirror Communities")
     def post_to_lemmy(self, request, queryset):

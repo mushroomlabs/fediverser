@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 LEMMY_CLIENTS = {}
 
 
+def make_reddit_client(**kw):
+    return Reddit(
+        client_id=settings.REDDIT_CLIENT_ID,
+        client_secret=settings.REDDIT_CLIENT_SECRET,
+        user_agent=settings.REDDIT_USER_AGENT,
+        **kw,
+    )
+
+
 def make_password():
     return secrets.token_urlsafe(30)
 
@@ -87,19 +96,16 @@ class RedditCommunity(models.Model):
     def most_recent_post(self):
         return self.posts.aggregate(most_recent=Max("created")).get("most_recent")
 
-    def __str__(self):
-        return f"/r/{self.name}"
-
-    def _get_client(self):
-        reddit = Reddit(
-            client_id=settings.REDDIT_CLIENT_ID,
-            client_secret=settings.REDDIT_CLIENT_SECRET,
-            user_agent=settings.REDDIT_USER_AGENT,
-        )
+    @property
+    def praw_object(self):
+        reddit = make_reddit_client()
         return reddit.subreddit(self.name)
 
     def new(self):
-        return self._get_client().new()
+        return self.praw_object.new()
+
+    def __str__(self):
+        return f"/r/{self.name}"
 
     class Meta:
         verbose_name_plural = "Subreddit"
@@ -200,6 +206,11 @@ class RedditSubmission(TimeStampedModel):
         text = self.title if not self.is_self_post else f"{self.title}\n {self.selftext}"
         return detect(text)
 
+    @property
+    def praw_object(self):
+        reddit = make_reddit_client()
+        return reddit.submission(id=self.id)
+
     def make_mirror(self):
         for lemmy_community in LemmyCommunity.objects.filter(
             reddittolemmycommunity__subreddit=self.subreddit
@@ -247,21 +258,23 @@ class RedditSubmission(TimeStampedModel):
 
         author = RedditAccount.make(post.author)
         try:
-            submission = subreddit.posts.create(
+            submission, _ = subreddit.posts.update_or_create(
                 id=post.id,
                 author=author,
                 url=post.url,
-                title=post.title,
-                selftext=post.selftext,
-                selftext_html=post.selftext_html,
-                media_only=post.media_only,
-                approved_at=get_date(post.approved_at_utc),
-                banned_at=get_date(post.banned_at_utc),
-                archived=post.archived,
-                locked=post.locked,
-                quarantined=post.quarantine,
-                removed=post.removed_by is not None,
-                over_18=post.over_18,
+                defaults=dict(
+                    title=post.title,
+                    selftext=post.selftext,
+                    selftext_html=post.selftext_html,
+                    media_only=post.media_only,
+                    approved_at=get_date(post.approved_at_utc),
+                    banned_at=get_date(post.banned_at_utc),
+                    archived=post.archived,
+                    locked=post.locked,
+                    quarantined=post.quarantine,
+                    removed=post.removed_by is not None,
+                    over_18=post.over_18,
+                ),
             )
             post.comments.replace_more(limit=None)
             for comment in post.comments:
