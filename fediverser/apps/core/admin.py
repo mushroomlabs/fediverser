@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from . import models
+from . import models, tasks
 
 
 class ReadOnlyMixin:
@@ -28,6 +28,13 @@ class LemmyCommunityAdmin(admin.ModelAdmin):
 class RedditCommunityAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
+
+    actions = ("fetch_new_posts",)
+
+    @admin.action(description="Fetch new submissions")
+    def fetch_new_posts(self, request, queryset):
+        for subreddit_name in queryset.values_list("name", flat=True):
+            tasks.fetch_new_posts.delay(subreddit_name=subreddit_name)
 
 
 @admin.register(models.RedditAccount)

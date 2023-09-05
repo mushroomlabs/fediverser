@@ -14,8 +14,8 @@ class FediverserCeleryConfig(object):
     broker_use_ssl = "FEDIVERSER_BROKER_USE_SSL" in os.environ
     beat_scheduler = "django_celery_beat.schedulers:DatabaseScheduler"
     beat_schedule = {
-        "fetch-new-reddit-posts": {
-            "task": "fediverser.apps.core.tasks.fetch_new_reddit_posts",
+        "update-subreddits": {
+            "task": "fediverser.apps.core.tasks.update_all_subreddits",
             "schedule": crontab(minute="*/10"),
         },
     }
