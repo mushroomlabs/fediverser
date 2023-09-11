@@ -43,8 +43,8 @@ x-fediverser: &fediverser_service
 
   volumes:
     - "${FEDIVERSER_APP_MOUNT_PATH:-./}:/app"
-    - "${FEDIVERSER_STATIC_MOUNT_PATH:-./docker/volumes/media/fediverser/static}:/var/fediverser/static"
-    - "${FEDIVERSER_MEDIA_MOUNT_PATH:-./docker/volumes/media/fediverser/media}:/var/fediverser/media"
+    - "${FEDIVERSER_STATIC_MOUNT_PATH:-./docker/volumes/fediverser/media/static}:/var/fediverser/static"
+    - "${FEDIVERSER_MEDIA_MOUNT_PATH:-./docker/volumes/fediverser/media/media}:/var/fediverser/media"
 
 services:
   db:
@@ -56,7 +56,7 @@ services:
       POSTGRES_PASSWORD: fediverser
       POSTGRES_DB: fediverser
     volumes:
-      - "${FEDIVERSER_DATABASE_MOUNT_PATH:-./docker/volumes/database/fediverser}:/var/lib/postgresql/data"
+      - "${FEDIVERSER_DATABASE_MOUNT_PATH:-./docker/volumes/fediverser/database}:/var/lib/postgresql/data"
 
   redis:
     <<: *fediverser_development
@@ -67,6 +67,8 @@ services:
       interval: 5s
       timeout: 30s
       retries: 50
+    volumes:
+      - "${FEDIVERSER_REDIS_MOUNT_PATH:-./docker/volumes/fediverser/redis}:/data"
 
 
   admin:
