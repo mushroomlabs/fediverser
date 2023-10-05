@@ -85,7 +85,7 @@ CACHES = {
 
 # Celery
 
-CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", default="redis://redis:6379/0")
+CELERY_BROKER_URL = env.str("FEDIVERSER_BROKER_URL", default="redis://redis:6379/0")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DATABASES = {
