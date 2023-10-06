@@ -1,18 +1,23 @@
 import datetime
 import logging
+import os
 import secrets
+import tempfile
 from typing import Optional
 
 import bcrypt
 import praw
+import requests
 from Crypto.PublicKey import RSA
 from django.conf import settings
 from django.db import models
 from django.db.models import Max
 from django.db.utils import DataError
+from django.template.defaultfilters import slugify
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from langdetect import detect
+from langdetect.lang_detect_exception import LangDetectException
 from model_utils.models import TimeStampedModel
 from praw import Reddit
 from pythorhead.types import LanguageType
@@ -215,6 +220,22 @@ class RedditSubmission(TimeStampedModel):
         return self.url.startswith("https://reddit.com") or self.has_self_text
 
     @property
+    def is_gallery_hosted_on_reddit(self):
+        return self.url.startswith("https://www.reddit.com/gallery/")
+
+    @property
+    def is_image_hosted_on_reddit(self):
+        return self.url.startswith("https://i.redd.it")
+
+    @property
+    def is_video_hosted_on_reddit(self):
+        return self.url.startswith("https://v.redd.it")
+
+    @property
+    def is_media_hosted_on_reddit(self):
+        return self.is_image_hosted_on_reddit or self.is_video_hosted_on_reddit
+
+    @property
     def language_code(self):
         text = self.title if not self.is_self_post else f"{self.title}\n {self.selftext}"
         return detect(text)
@@ -236,7 +257,7 @@ class RedditSubmission(TimeStampedModel):
                 community_id = lemmy_client.discover_community(lemmy_community.fqdn)
                 try:
                     language = LanguageType[self.language_code.upper()]
-                except (KeyError, ValueError):
+                except (KeyError, ValueError, LangDetectException):
                     language = LanguageType.UNDETERMINED
 
                 params = dict(
@@ -245,7 +266,20 @@ class RedditSubmission(TimeStampedModel):
                     nsfw=self.over_18,
                     language_id=language.value,
                 )
-                if self.is_self_post:
+                if self.is_image_hosted_on_reddit:
+                    _, suffix = self.url.rsplit(".", 1)
+
+                    file_name = ".".join([slugify(self.title), suffix])
+
+                    image_download = requests.get(self.url)
+                    image_download.raise_for_status()
+                    with tempfile.TemporaryDirectory() as td:
+                        file_path = os.path.join(td, file_name)
+                        with open(file_path, "w+b") as f:
+                            f.write(image_download.content)
+                        upload_response = lemmy_client.image.upload(file_path)
+                    params["url"] = upload_response[0]["image_url"]
+                elif self.is_self_post:
                     params["body"] = self.selftext
                 else:
                     params["url"] = self.url

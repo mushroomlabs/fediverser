@@ -12,16 +12,17 @@ x-fediverser: &fediverser_service
     context: .
   restart: unless-stopped
   depends_on: &fediverser_service_dependencies
-    - redis
+    - cache
+    - broker
     - db
 
   environment: &fediverser_web_envvars
     DJANGO_SETTINGS_MODULE: fediverser.admin.settings
     FEDIVERSER_STATIC_ROOT: /var/fediverser/static
     FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
-    FEDIVERSER_BROKER_URL: redis://redis:6379/1
+    FEDIVERSER_BROKER_URL: redis://broker:6379/0
     FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
-    FEDIVERSER_CACHE_LOCATION: redis://redis:6379/0
+    FEDIVERSER_CACHE_LOCATION: redis://cache:6379/0
     FEDIVERSER_CORS_HEADERS_ENABLED: 1
     FEDIVERSER_DATABASE_HOST: db
     FEDIVERSER_DATABASE_PORT: 5432
@@ -58,7 +59,7 @@ services:
     volumes:
       - "${FEDIVERSER_DATABASE_MOUNT_PATH:-./docker/volumes/fediverser/database}:/var/lib/postgresql/data"
 
-  redis:
+  broker:
     <<: *fediverser_development
     image: redis:latest
     restart: unless-stopped
@@ -68,8 +69,19 @@ services:
       timeout: 30s
       retries: 50
     volumes:
-      - "${FEDIVERSER_REDIS_MOUNT_PATH:-./docker/volumes/fediverser/redis}:/data"
+      - "${FEDIVERSER_BROKER_MOUNT_PATH:-./docker/volumes/fediverser/broker}:/data"
 
+  cache:
+    <<: *fediverser_development
+    image: redis:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - "${FEDIVERSER_CACHE_MOUNT_PATH:-./docker/volumes/fediverser/cache}:/data"
 
   admin:
     <<: *fediverser_service
@@ -144,7 +156,7 @@ services:
       PICTRS__MEDIA__GIF__MAX_FRAME_COUNT: 200
       PICTRS__STORE__TYPE: object_storage
       PICTRS__STORE__ENDPOINT: "http://lemmy-minio:9000"
-      PICTRS__STORE__BUCKET_NAME: "lemmy_media"
+      PICTRS__STORE__BUCKET_NAME: "lemmy-media"
       PICTRS__STORE__REGION: "us-east-1"
       PICTRS__STORE__USE_PATH_STYLE: "true"
       PICTRS__STORE__ACCESS_KEY: minio_user
@@ -154,6 +166,7 @@ services:
 
   lemmy-proxy:
     image: nginx:1-alpine
+    restart: on-failure
     ports:
       - "8888:80"
     volumes:
@@ -172,5 +185,25 @@ services:
     environment:
       MINIO_ROOT_USER: minio_user
       MINIO_ROOT_PASSWORD: minio_pass
+    ports:
+      - "9000:9000"
     volumes:
       - "${FEDIVERSER_LEMMY_MEDIA_MOUNT_PATH:-./docker/volumes/lemmy-media}:/data"
+
+  init_minio_buckets:
+    image: minio/mc
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_pass
+
+    depends_on:
+      - lemmy-minio
+
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add fediverser http://lemmy-minio:9000 minio_user minio_pass;
+      /usr/bin/mc mb fediverser/lemmy-media;
+      /usr/bin/mc anonymous set download fediverser/lemmy-media;
+      /usr/bin/mc anonymous set public fediverser/lemmy-media;
+      exit 0;
+      "
