@@ -210,6 +210,8 @@ class RedditSubmission(TimeStampedModel):
     quarantined = models.BooleanField(default=False)
     removed = models.BooleanField(default=False)
     over_18 = models.BooleanField(default=False)
+    marked_as_spam = models.BooleanField(default=False)
+    marked_as_duplicate = models.BooleanField(default=False)
 
     @property
     def has_self_text(self):
@@ -218,6 +220,10 @@ class RedditSubmission(TimeStampedModel):
     @property
     def is_self_post(self):
         return self.url.startswith("https://reddit.com") or self.has_self_text
+
+    @property
+    def banned(self):
+        return self.banned_at is not None
 
     @property
     def is_gallery_hosted_on_reddit(self):
@@ -350,6 +356,7 @@ class RedditComment(TimeStampedModel):
     stickied = models.BooleanField(default=False)
     edited = models.BooleanField(default=False)
     distinguished = models.BooleanField(default=False)
+    marked_as_spam = models.BooleanField(default=False)
 
     @property
     def is_submitter(self):

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import Count
 
 from . import models, tasks
 
@@ -39,9 +40,13 @@ class RedditCommunityAdmin(admin.ModelAdmin):
 
 @admin.register(models.RedditAccount)
 class RedditAccountAdmin(admin.ModelAdmin):
-    list_display = ("username",)
+    list_display = ("username", "marked_as_spammer", "rejected_invite")
     search_fields = ("username",)
-    actions = ("create_lemmy_mirror",)
+    actions = ("create_lemmy_mirror", "mark_as_spammer")
+
+    @admin.action(description="Flag as Spammer account")
+    def mark_as_spammer(self, request, queryset):
+        return queryset.update(marked_as_spammer=True)
 
     @admin.action(description="Create account on Lemmy Mirror Instance")
     def create_lemmy_mirror(self, request, queryset):
@@ -63,25 +68,50 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
         "subreddit",
         "author",
         "url",
-        "media_only",
-        "locked",
+        "total_comments",
         "quarantined",
         "removed",
         "over_18",
-        "archived",
+        "is_spam",
+        "is_duplicate",
     )
     list_filter = (
         "subreddit",
-        "media_only",
-        "locked",
         "quarantined",
         "removed",
         "over_18",
-        "archived",
+        "marked_as_spam",
+        "marked_as_duplicate",
     )
     list_select_related = ("subreddit", "author")
     search_fields = ("title",)
-    actions = ("fetch_from_reddit", "post_to_lemmy", "send_invite_to_post_author")
+    actions = (
+        "fetch_from_reddit",
+        "post_to_lemmy",
+        "send_invite_to_post_author",
+        "mark_as_spam",
+        "mark_as_duplicate",
+        "mark_as_ham",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(total_comments=Count("comments"))
+
+    def total_comments(self, obj):
+        return obj.total_comments
+
+    def is_duplicate(self, obj):
+        return obj.marked_as_duplicate
+
+    def is_spam(self, obj):
+        return obj.marked_as_spam
+
+    is_duplicate.short_description = "Duplicate"
+    is_duplicate.boolean = True
+
+    is_spam.short_description = "Spam"
+    is_spam.boolean = True
 
     @admin.action(description="Fetch data from Reddit")
     def fetch_from_reddit(self, request, queryset):
@@ -104,12 +134,39 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
                     redditor_name=post.author.username, subreddit_name=post.subreddit.name
                 )
 
+    @admin.action(description="Flag as Spam")
+    def mark_as_spam(self, request, queryset):
+        return queryset.update(marked_as_spam=True)
+
+    @admin.action(description="Un-flag as Spam")
+    def mark_as_ham(self, request, queryset):
+        return queryset.update(marked_as_spam=False)
+
+    @admin.action(description="Flag as Duplicate")
+    def mark_as_duplicate(self, request, queryset):
+        return queryset.update(marked_as_duplicate=True)
+
 
 @admin.register(models.RedditComment)
 class RedditCommentAdmin(ReadOnlyMixin, admin.ModelAdmin):
     date_hierarchy = "created"
-    list_display = ("submission", "author")
-    list_filter = ("distinguished",)
+    list_display = ("submission_id", "author", "body", "is_spam")
+    list_filter = ("distinguished", "marked_as_spam")
+    actions = ("mark_as_spam", "mark_as_ham")
+
+    def is_spam(self, obj):
+        return obj.marked_as_spam
+
+    is_spam.short_description = "Spam"
+    is_spam.boolean = True
+
+    @admin.action(description="Flag as Spam")
+    def mark_as_spam(self, request, queryset):
+        return queryset.update(marked_as_spam=True)
+
+    @admin.action(description="Un-flag as Spam")
+    def mark_as_ham(self, request, queryset):
+        return queryset.update(marked_as_spam=False)
 
 
 @admin.register(models.LemmyCommunityInviteTemplate)
