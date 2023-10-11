@@ -291,6 +291,23 @@ class RedditSubmission(TimeStampedModel):
         return self.url.startswith("/r/")
 
     @property
+    def can_be_submitted_automatically(self):
+        return all(
+            [
+                not self.over_18,
+                not self.banned_at,
+                not self.quarantined,
+                not self.removed,
+                not self.url.startswith("https://twitter.com"),
+                not self.url.startswith("https://x.com"),
+                not self.is_video_hosted_on_reddit,
+                not self.is_gallery_hosted_on_reddit,
+                not self.marked_as_spam,
+                not self.marked_as_duplicate,
+            ]
+        )
+
+    @property
     def banned(self):
         return self.banned_at is not None
 

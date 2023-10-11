@@ -20,6 +20,9 @@ def on_reddit_account_created_make_mirror(sender, **kw):
 def on_reddit_submission_created_post_to_lemmy_communities(sender, **kw):
     if kw["created"] and not kw["raw"]:
         reddit_submission = kw["instance"]
+        if not reddit_submission.can_be_submitted_automatically:
+            return
+
         lemmy_communities = LemmyCommunity.objects.filter(
             reddittolemmycommunity__subreddit=reddit_submission.subreddit
         )
