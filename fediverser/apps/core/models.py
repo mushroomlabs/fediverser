@@ -127,7 +127,7 @@ class LemmyCommunity(models.Model):
 
             # Community does not want to be flooded with automatic submissions
             now = timezone.now()
-            one_day_ago = now - datetime.timedelta(day=1)
+            one_day_ago = now - datetime.timedelta(days=1)
             recent_mirrored_posts = LemmyMirroredPost.objects.filter(
                 lemmy_community=self, created__gte=one_day_ago
             )
@@ -193,6 +193,10 @@ class RedditAccount(models.Model):
 
     def register_mirror(self):
         lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        if lemmy_mirror is None:
+            logger.warning("Lemmy Mirror instance is not properly configured")
+            return
+
         private_key, public_key = generate_rsa_keypair()
 
         person, _ = lemmy_models.Person.objects.get_or_create(
@@ -228,6 +232,9 @@ class RedditAccount(models.Model):
             return LEMMY_CLIENTS[self.username]
 
         lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+
+        if lemmy_mirror is None:
+            raise ValueError("Lemmy Mirror instance is not available or not configured")
 
         lemmy_client = lemmy_mirror._get_client()
         lemmy_client.log_in(self.username, self.password)

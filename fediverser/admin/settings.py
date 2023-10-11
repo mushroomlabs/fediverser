@@ -12,6 +12,8 @@ BASE_DIR = os.path.dirname(PROJECT_DIR)
 SECRET_KEY = env.str("FEDIVERSER_SECRET_KEY")
 
 DEBUG = env.bool("FEDIVERSER_DEBUG", default=False)
+TEST_MODE = "FEDIVERSER_TEST" in os.environ
+
 
 ALLOWED_HOSTS = ["*"]
 
