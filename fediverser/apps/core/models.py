@@ -62,6 +62,10 @@ def get_hashed_password(cleartext: str) -> str:
 class LemmyInstance(models.Model):
     domain = models.CharField(max_length=255, unique=True)
 
+    @property
+    def mirroring(self):
+        return lemmy_models.Instance.objects.filter(domain=self.domain).first()
+
     def __str__(self):
         return self.domain
 
@@ -87,6 +91,55 @@ class LemmyCommunity(models.Model):
                 ).values_list("id", flat=True)
             )
         ]
+
+    @property
+    def mirroring(self):
+        if self.instance.mirroring is None:
+            return None
+
+        return lemmy_models.Community.objects.filter(
+            instance=self.instance.mirroring, name=self.name
+        ).first()
+
+    def can_accept_automatic_submission(self, reddit_submission):
+        try:
+            lemmy_poster = RedditToLemmyCommunity.objects.get(
+                subreddit=reddit_submission, lemmy_community=self
+            )
+
+            # Reject because community does not want automatic submissions
+            if not lemmy_poster.accepts_automatic_submissions:
+                return False
+
+            # Community does not want self posts
+            if reddit_submission.is_self_post and not lemmy_poster.accepts_self_posts:
+                return False
+
+            # Community does not want link posts
+            if reddit_submission.is_link_post and not lemmy_poster.accepts_link_posts:
+                return False
+
+            duplicates = lemmy_models.Post.objects.filter(url=reddit_submission.url)
+
+            # Community already has this url posted
+            if self.mirroring is not None and duplicates.filter(community=self.mirroring).exists():
+                return False
+
+            # Community does not want to be flooded with automatic submissions
+            now = timezone.now()
+            one_day_ago = now - datetime.timedelta(day=1)
+            recent_mirrored_posts = LemmyMirroredPost.objects.filter(
+                lemmy_community=self, created__gte=one_day_ago
+            )
+            if lemmy_poster.automatic_submission_limit is not None:
+                if recent_mirrored_posts.count() >= lemmy_poster.automatic_submission_limit:
+                    return False
+
+            # Community has no objection to this submission
+            return True
+
+        except RedditToLemmyCommunity.DoesNotExist:
+            return False
 
     def __str__(self):
         return self.fqdn
@@ -220,8 +273,22 @@ class RedditSubmission(TimeStampedModel):
         return self.selftext is not None and self.selftext.strip()
 
     @property
+    def is_link_post(self):
+        return all(
+            [
+                not self.is_cross_post,
+                not self.is_media_hosted_on_reddit,
+                not self.url.startswith("https://reddit.com"),
+            ]
+        )
+
+    @property
     def is_self_post(self):
         return self.url.startswith("https://reddit.com") or self.has_self_text
+
+    @property
+    def is_cross_post(self):
+        return self.url.startswith("/r/")
 
     @property
     def banned(self):
@@ -253,58 +320,56 @@ class RedditSubmission(TimeStampedModel):
         reddit = make_reddit_client()
         return reddit.submission(id=self.id)
 
-    def make_mirror(self):
-        for lemmy_community in LemmyCommunity.objects.filter(
-            reddittolemmycommunity__subreddit=self.subreddit
-        ):
-            mirrored_post = LemmyMirroredPost.objects.filter(
-                reddit_submission=self, lemmy_community=lemmy_community
-            ).first()
-            if mirrored_post is None:
-                lemmy_client = self.author.make_lemmy_client()
-                community_id = lemmy_client.discover_community(lemmy_community.fqdn)
-                try:
-                    language = LanguageType[self.language_code.upper()]
-                except (KeyError, ValueError, LangDetectException):
-                    language = LanguageType.UNDETERMINED
+    def post_to_lemmy(self, lemmy_community):
+        mirrored_post = LemmyMirroredPost.objects.filter(
+            reddit_submission=self, lemmy_community=lemmy_community
+        ).first()
+        if mirrored_post is None:
+            lemmy_client = self.author.make_lemmy_client()
+            community_id = lemmy_client.discover_community(lemmy_community.fqdn)
+            try:
+                language = LanguageType[self.language_code.upper()]
+            except (KeyError, ValueError, LangDetectException):
+                language = LanguageType.UNDETERMINED
 
-                params = dict(
-                    community_id=community_id,
-                    name=self.title,
-                    nsfw=self.over_18,
-                    language_id=language.value,
-                )
-                if self.is_image_hosted_on_reddit:
-                    _, suffix = self.url.rsplit(".", 1)
+            params = dict(
+                community_id=community_id,
+                name=self.title,
+                nsfw=self.over_18,
+                language_id=language.value,
+            )
 
-                    file_name = ".".join([slugify(self.title), suffix])
+            if not self.is_self_post:
+                params["url"] = self.url
 
-                    image_download = requests.get(self.url)
-                    image_download.raise_for_status()
-                    with tempfile.TemporaryDirectory() as td:
-                        file_path = os.path.join(td, file_name)
-                        with open(file_path, "w+b") as f:
-                            f.write(image_download.content)
-                        upload_response = lemmy_client.image.upload(file_path)
-                    params["url"] = upload_response[0]["image_url"]
-                elif self.is_self_post:
-                    params["body"] = self.selftext
-                else:
-                    params["url"] = self.url
+            if self.is_image_hosted_on_reddit:
+                _, suffix = self.url.rsplit(".", 1)
 
-                lemmy_post = lemmy_client.post.create(**params)
-                mirrored_post = LemmyMirroredPost.objects.create(
-                    reddit_submission=self,
-                    lemmy_post_id=lemmy_post["post_view"]["post"]["id"],
-                    lemmy_community=lemmy_community,
-                )
-            for reddit_comment in self.comments.filter(parent=None).select_related("author"):
-                mirrored_comment = mirrored_post.comments.filter(
-                    reddit_comment=reddit_comment
-                ).first()
+                file_name = ".".join([slugify(self.title), suffix])
 
-                if mirrored_comment is None:
-                    mirrored_comment = reddit_comment.make_mirror(mirrored_post)
+                image_download = requests.get(self.url)
+                image_download.raise_for_status()
+                with tempfile.TemporaryDirectory() as td:
+                    file_path = os.path.join(td, file_name)
+                    with open(file_path, "w+b") as f:
+                        f.write(image_download.content)
+                    upload_response = lemmy_client.image.upload(file_path)
+                params["url"] = upload_response[0]["image_url"]
+
+            if self.has_self_text:
+                params["body"] = self.selftext
+
+            lemmy_post = lemmy_client.post.create(**params)
+            mirrored_post = LemmyMirroredPost.objects.create(
+                reddit_submission=self,
+                lemmy_post_id=lemmy_post["post_view"]["post"]["id"],
+                lemmy_community=lemmy_community,
+            )
+        for reddit_comment in self.comments.filter(parent=None).select_related("author"):
+            mirrored_comment = mirrored_post.comments.filter(reddit_comment=reddit_comment).first()
+
+            if mirrored_comment is None:
+                mirrored_comment = reddit_comment.make_mirror(mirrored_post)
 
     @classmethod
     def make(cls, subreddit: RedditCommunity, post: praw.models.Submission):
@@ -448,6 +513,24 @@ class RedditToLemmyCommunity(models.Model):
     automatic_submission_limit = models.SmallIntegerField(
         null=True, blank=True, help_text="Limit of maximum automatic submissions per 24h"
     )
+
+    @property
+    def accepts_automatic_submissions(self):
+        return self.automatic_submission_policy != AutomaticSubmissionPolicies.NONE
+
+    @property
+    def accepts_self_posts(self):
+        return self.automatic_submission_policy in [
+            AutomaticSubmissionPolicies.SELF_POST_ONLY,
+            AutomaticSubmissionPolicies.FULL,
+        ]
+
+    @property
+    def accepts_link_posts(self):
+        return self.automatic_submission_policy in [
+            AutomaticSubmissionPolicies.LINK_POST_ONLY,
+            AutomaticSubmissionPolicies.FULL,
+        ]
 
     class Meta:
         unique_together = ("subreddit", "lemmy_community")

@@ -51,6 +51,19 @@ def send_lemmy_community_invite_to_redditor(redditor_name: str, subreddit_name: 
 
 
 @shared_task
+def mirror_reddit_submission(reddit_submission_id, lemmy_community_id):
+    try:
+        reddit_submission = RedditSubmission.objects.get(id=reddit_submission_id)
+        lemmy_community = LemmyCommunity.objects.get(id=lemmy_community_id)
+
+        reddit_submission.post_to_lemmy(lemmy_community)
+    except RedditSubmission.DoesNotExist:
+        logger.exception("Reddit Submission not found in database")
+    except LemmyCommunity.DoesNotExist:
+        logger.exception("Lemmy Community not recorded")
+
+
+@shared_task
 def fetch_new_posts(subreddit_name):
     NOW = datetime.datetime.now()
     THRESHOLD = NOW - datetime.timedelta(hours=12)

@@ -127,10 +127,17 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
                 subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
             )
 
-    @admin.action(description="Post to on Mirror Communities")
+    @admin.action(description="Post to Mirror Communities")
     def post_to_lemmy(self, request, queryset):
-        for post in queryset:
-            post.make_mirror()
+        for reddit_submission in queryset:
+            lemmy_community_ids = models.LemmyCommunity.objects.filter(
+                reddittolemmycommunity__subreddit=reddit_submission.subreddit
+            ).values_list("id", flat=True)
+            for lemmy_community_id in lemmy_community_ids:
+                tasks.mirror_reddit_submission.delay(
+                    reddit_submission_id=reddit_submission.id,
+                    lemmy_community_id=lemmy_community_id,
+                )
 
     @admin.action(description="Send invite to author")
     def send_invite_to_post_author(self, request, queryset):
