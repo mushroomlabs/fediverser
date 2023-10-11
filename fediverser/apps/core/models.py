@@ -550,7 +550,7 @@ class RedditToLemmyCommunity(models.Model):
     @property
     def accepts_link_posts(self):
         return self.automatic_submission_policy in [
-            AutomaticSubmissionPolicies.LINK_POST_ONLY,
+            AutomaticSubmissionPolicies.LINK_ONLY,
             AutomaticSubmissionPolicies.FULL,
         ]
 
