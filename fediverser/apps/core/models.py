@@ -104,7 +104,7 @@ class LemmyCommunity(models.Model):
     def can_accept_automatic_submission(self, reddit_submission):
         try:
             lemmy_poster = RedditToLemmyCommunity.objects.get(
-                subreddit=reddit_submission, lemmy_community=self
+                subreddit=reddit_submission.subreddit, lemmy_community=self
             )
 
             # Reject because community does not want automatic submissions
