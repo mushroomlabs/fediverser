@@ -18,6 +18,10 @@ class FediverserCeleryConfig(object):
             "task": "fediverser.apps.core.tasks.update_all_subreddits",
             "schedule": crontab(minute="*/10"),
         },
+        "update-comments": {
+            "task": "fediverser.apps.core.tasks.fetch_new_comments",
+            "schedule": crontab(minute="*/3"),
+        },
     }
 
     task_always_eager = TEST_MODE

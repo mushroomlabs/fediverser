@@ -4,6 +4,8 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Max, Q
+from django.utils import timezone
 
 from .models import (
     LemmyCommunity,
@@ -65,7 +67,7 @@ def mirror_reddit_submission(reddit_submission_id, lemmy_community_id):
 
 @shared_task
 def fetch_new_posts(subreddit_name):
-    NOW = datetime.datetime.now()
+    NOW = timezone.now()
     THRESHOLD = NOW - datetime.timedelta(hours=12)
 
     try:
@@ -75,6 +77,24 @@ def fetch_new_posts(subreddit_name):
             RedditSubmission.make(subreddit=subreddit, post=post)
     except RedditCommunity.DoesNotExist:
         logger.warning("Subreddit not found", extra={"name": subreddit_name})
+
+
+@shared_task
+def fetch_new_comments():
+    NOW = timezone.now()
+
+    mirrored_submissions = RedditSubmission.objects.filter(
+        lemmy_mirrored_posts__isnull=False
+    ).annotate(most_recent_mirrored_comment=Max("lemmy_mirrored_posts__comments__modified"))
+
+    old_post = Q(created__lte=NOW - datetime.timedelta(hours=12))
+    new_post = Q(created__gte=NOW - datetime.timedelta(minutes=3))
+    fresh_comment = Q(most_recent_mirrored_comment__gte=NOW - datetime.timedelta(minutes=3))
+
+    for reddit_submission in mirrored_submissions.exclude(old_post | new_post | fresh_comment):
+        RedditSubmission.make(
+            subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
+        )
 
 
 @shared_task

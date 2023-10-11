@@ -298,8 +298,8 @@ class RedditSubmission(TimeStampedModel):
                 not self.banned_at,
                 not self.quarantined,
                 not self.removed,
-                not self.url.startswith("https://twitter.com"),
-                not self.url.startswith("https://x.com"),
+                self.url is not None and not self.url.startswith("https://twitter.com"),
+                self.url is not None and not self.url.startswith("https://x.com"),
                 not self.is_video_hosted_on_reddit,
                 not self.is_gallery_hosted_on_reddit,
                 not self.marked_as_spam,
@@ -393,14 +393,17 @@ class RedditSubmission(TimeStampedModel):
         def get_date(timestamp):
             return timestamp and make_aware(datetime.datetime.fromtimestamp(timestamp))
 
+        logger.info(f"Syncing reddit post {post.id}")
+
         author = RedditAccount.make(post.author)
         try:
             submission, _ = subreddit.posts.update_or_create(
                 id=post.id,
-                author=author,
-                url=post.url,
                 defaults=dict(
+                    author=author,
+                    url=post.url,
                     title=post.title,
+                    created=get_date(post.created_utc),
                     selftext=post.selftext,
                     selftext_html=post.selftext_html,
                     media_only=post.media_only,
@@ -451,6 +454,7 @@ class RedditComment(TimeStampedModel):
         return self.body and detect(self.body)
 
     def make_mirror(self, mirrored_post, lemmy_parent_id=None):
+        logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")
         lemmy_client = self.author.make_lemmy_client()
         try:
             language = LanguageType[self.language_code.upper()]
@@ -493,6 +497,7 @@ class RedditComment(TimeStampedModel):
         comment: praw.models.Comment,
         parent: Optional["RedditComment"] = None,
     ):
+        logger.info(f"Syncing reddit comment {comment.id}")
         commenter = RedditAccount.make(comment.author)
         reddit_comment, _ = cls.objects.update_or_create(
             id=comment.id,
