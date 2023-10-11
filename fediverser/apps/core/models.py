@@ -24,6 +24,8 @@ from pythorhead.types import LanguageType
 
 from fediverser.apps.lemmy import models as lemmy_models
 
+from .choices import AutomaticCommentPolicies, AutomaticSubmissionPolicies
+
 logger = logging.getLogger(__name__)
 
 
@@ -432,6 +434,20 @@ class RedditComment(TimeStampedModel):
 class RedditToLemmyCommunity(models.Model):
     subreddit = models.ForeignKey(RedditCommunity, on_delete=models.CASCADE)
     lemmy_community = models.ForeignKey(LemmyCommunity, on_delete=models.CASCADE)
+
+    automatic_submission_policy = models.TextField(
+        max_length=16,
+        choices=AutomaticSubmissionPolicies.choices,
+        default=AutomaticSubmissionPolicies.NONE,
+    )
+    automatic_comment_policy = models.TextField(
+        max_length=16,
+        choices=AutomaticCommentPolicies.choices,
+        default=AutomaticCommentPolicies.NONE,
+    )
+    automatic_submission_limit = models.SmallIntegerField(
+        null=True, blank=True, help_text="Limit of maximum automatic submissions per 24h"
+    )
 
     class Meta:
         unique_together = ("subreddit", "lemmy_community")

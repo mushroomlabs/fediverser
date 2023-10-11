@@ -56,7 +56,14 @@ class RedditAccountAdmin(admin.ModelAdmin):
 
 @admin.register(models.RedditToLemmyCommunity)
 class RedditToLemmyCommunityAdmin(admin.ModelAdmin):
-    list_display = ("subreddit", "lemmy_community")
+    list_display = (
+        "subreddit",
+        "lemmy_community",
+        "automatic_submission_policy",
+        "automatic_comment_policy",
+        "automatic_submission_limit",
+    )
+    list_filter = ("automatic_submission_policy", "automatic_comment_policy")
     autocomplete_fields = ("subreddit", "lemmy_community")
 
 
