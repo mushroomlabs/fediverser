@@ -1,0 +1,2 @@
+class LemmyClientError(Exception):
+    pass

@@ -7,11 +7,14 @@ from django.db import transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
+from .exceptions import LemmyClientError
 from .models import (
     LemmyCommunity,
     LemmyCommunityInvite,
     LemmyCommunityInviteTemplate,
+    LemmyMirroredPost,
     RedditAccount,
+    RedditComment,
     RedditCommunity,
     RedditSubmission,
     make_reddit_client,
@@ -63,6 +66,29 @@ def mirror_reddit_submission(reddit_submission_id, lemmy_community_id):
         logger.exception("Reddit Submission not found in database")
     except LemmyCommunity.DoesNotExist:
         logger.exception("Lemmy Community not recorded")
+
+
+@shared_task
+def mirror_reddit_comment(reddit_comment_id, mirrored_post_id):
+    try:
+        comment = RedditComment.objects.get(id=reddit_comment_id)
+        mirrored_post = LemmyMirroredPost.objects.get(id=mirrored_post_id)
+
+        lemmy_parent_comment = (
+            comment.parent and mirrored_post.comments.filter(reddit_comment=comment.parent).first()
+        )
+
+        comment.make_mirror(
+            mirrored_post=mirrored_post,
+            lemmy_parent_id=lemmy_parent_comment and lemmy_parent_comment.id,
+        )
+
+    except RedditComment.DoesNotExist:
+        logger.exception("Reddit comment not found in database")
+    except LemmyMirroredPost.DoesNotExist:
+        logger.exception("Lemmy mirrored post not recorded")
+    except LemmyClientError:
+        logger.exception("Lemmy instance rejected comment")
 
 
 @shared_task

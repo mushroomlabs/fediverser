@@ -42,18 +42,10 @@ def on_reddit_comment_created_post_to_lemmy_communities(sender, **kw):
         if not comment.should_be_mirrored:
             return
 
-        reddit_submission = comment.submission
-
-        for mirrored_post in reddit_submission.lemmy_mirrored_posts.all():
+        for mirrored_post in comment.submission.lemmy_mirrored_posts.all():
             mirror_comments = mirrored_post.comments.filter(reddit_comment=comment)
 
-            lemmy_parent_comment = (
-                comment.parent
-                and mirrored_post.comments.filter(reddit_comment=comment.parent).first()
-            )
-
             if not mirror_comments.exists():
-                comment.make_mirror(
-                    mirrored_post=mirrored_post,
-                    lemmy_parent_id=lemmy_parent_comment and lemmy_parent_comment.id,
+                tasks.mirror_reddit_comment.delay(
+                    reddit_comment_id=comment.id, mirrored_post_id=mirrored_post.id
                 )
