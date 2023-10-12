@@ -179,6 +179,7 @@ class RedditAccount(models.Model):
     )
     rejected_invite = models.BooleanField(default=False)
     marked_as_spammer = models.BooleanField(default=False)
+    marked_as_bot = models.BooleanField(default=False)
 
     @property
     def can_send_invite(self):
@@ -311,6 +312,8 @@ class RedditSubmission(TimeStampedModel):
                 not self.is_gallery_hosted_on_reddit,
                 not self.marked_as_spam,
                 not self.marked_as_duplicate,
+                self.author is not None and not self.author.marked_as_bot,
+                self.author is not None and not self.author.marked_as_spammer,
             ]
         )
 
@@ -459,6 +462,18 @@ class RedditComment(TimeStampedModel):
     @property
     def language_code(self):
         return self.body and detect(self.body)
+
+    @property
+    def should_be_mirrored(self):
+        return all(
+            [
+                not self.marked_as_spam,
+                not self.stickied,
+                self.author is not None and not self.author.marked_as_bot,
+                self.author is not None and not self.author.marked_as_spammer,
+                not self.submission.marked_as_spam,
+            ]
+        )
 
     def make_mirror(self, mirrored_post, lemmy_parent_id=None):
         logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")

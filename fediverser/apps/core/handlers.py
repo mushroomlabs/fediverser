@@ -39,6 +39,9 @@ def on_reddit_submission_created_post_to_lemmy_communities(sender, **kw):
 def on_reddit_comment_created_post_to_lemmy_communities(sender, **kw):
     if kw["created"] and not kw["raw"]:
         comment = kw["instance"]
+        if not comment.should_be_mirrored:
+            return
+
         reddit_submission = comment.submission
 
         for mirrored_post in reddit_submission.lemmy_mirrored_posts.all():
