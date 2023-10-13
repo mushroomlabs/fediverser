@@ -4,7 +4,7 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Max, Q
+from django.db.models import Max, Q
 from django.utils import timezone
 
 from .choices import AutomaticSubmissionPolicies
@@ -108,13 +108,13 @@ def update_all_subreddits():
 @shared_task
 def push_new_comments_to_lemmy():
     comments_pending = RedditComment.objects.filter(
-        reddit_submission__lemmy_mirrored_posts__isnull=False, lemmy_mirrored_comments__isnull=True
+        submission__lemmy_mirrored_posts__isnull=False, lemmy_mirrored_comments__isnull=True
     ).select_related("parent")
 
     for comment in comments_pending:
         if comment.should_be_mirrored:
-            for mirrored_post in comment.reddit_submission.lemmy_mirrored_posts.all():
-                comment.make_mirror(mirrored_post=mirrored_post)
+            for mirrored_post in comment.submission.lemmy_mirrored_posts.all():
+                comment.make_mirror(mirrored_post=mirrored_post, include_children=False)
 
 
 @shared_task
