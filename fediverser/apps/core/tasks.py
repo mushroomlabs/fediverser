@@ -12,7 +12,6 @@ from .models import (
     LemmyCommunity,
     LemmyCommunityInvite,
     LemmyCommunityInviteTemplate,
-    LemmyMirroredPost,
     RedditAccount,
     RedditComment,
     RedditCommunity,
@@ -69,19 +68,6 @@ def mirror_reddit_submission(reddit_submission_id, lemmy_community_id):
 
 
 @shared_task
-def mirror_reddit_comment(reddit_comment_id, mirrored_post_id):
-    try:
-        comment = RedditComment.objects.get(id=reddit_comment_id)
-        mirrored_post = LemmyMirroredPost.objects.get(id=mirrored_post_id)
-        comment.make_mirror(mirrored_post=mirrored_post)
-
-    except RedditComment.DoesNotExist:
-        logger.exception("Reddit comment not found in database")
-    except LemmyMirroredPost.DoesNotExist:
-        logger.exception("Lemmy mirrored post not recorded")
-
-
-@shared_task
 def fetch_new_posts(subreddit_name):
     NOW = timezone.now()
     THRESHOLD = NOW - datetime.timedelta(hours=12)
@@ -120,36 +106,51 @@ def update_all_subreddits():
 
 
 @shared_task
-def push_updates_to_lemmy():
+def push_new_comments_to_lemmy():
+    comments_pending = RedditComment.objects.filter(
+        reddit_submission__lemmy_mirrored_posts__isnull=False, lemmy_mirrored_comments__isnull=True
+    ).select_related("parent")
+
+    for comment in comments_pending:
+        if comment.should_be_mirrored:
+            for mirrored_post in comment.reddit_submission.lemmy_mirrored_posts.all():
+                comment.make_mirror(mirrored_post=mirrored_post)
+
+
+@shared_task
+def push_new_submissions_to_lemmy():
     NOW = timezone.now()
 
     NO_MIRROR_ALLOWED = AutomaticSubmissionPolicies.NONE
     submissions = (
         RedditSubmission.objects.filter()
-        .annotate(mirrors=Count("lemmy_mirrored_posts"))
         .annotate(latest_comment=Max("comments__created"))
         .annotate(latest_mirror=Max("lemmy_mirrored_posts__comments__created"))
     )
 
     unmapped = Q(subreddit__reddittolemmycommunity__isnull=True)
     old_post = Q(created__lte=NOW - datetime.timedelta(days=1))
+    already_posted = Q(lemmy_mirrored_posts__isnull=False)
     automatic_mirror_disallowed = Q(
         subreddit__reddittolemmycommunity__automatic_submission_policy=NO_MIRROR_ALLOWED
     )
     from_spammer = Q(author__marked_as_spammer=True)
     from_bot = Q(author__marked_as_bot=True)
 
-    unpostable = unmapped | automatic_mirror_disallowed | from_spammer | from_bot | old_post
+    to_exclude = (
+        unmapped
+        | automatic_mirror_disallowed
+        | from_spammer
+        | from_bot
+        | old_post
+        | already_posted
+    )
 
-    for reddit_submission in submissions.exclude(unpostable):
-        has_mirrors = reddit_submission.mirrors > 0
+    for reddit_submission in submissions.exclude(to_exclude):
         last_commented_at = reddit_submission.latest_comment
         last_mirrored_at = reddit_submission.latest_mirror
 
         if not reddit_submission.can_be_submitted_automatically:
-            continue
-
-        if last_commented_at is None and has_mirrors:
             continue
 
         if last_commented_at is not None and last_mirrored_at is not None:
@@ -164,7 +165,12 @@ def push_updates_to_lemmy():
             if lemmy_community.can_accept_automatic_submission(reddit_submission):
                 try:
                     reddit_submission.post_to_lemmy(lemmy_community)
+                    logger.info(f"Posted {reddit_submission.id} to {lemmy_community.name}")
                 except Exception:
                     logger.exception(f"Failed to post {reddit_submission.id}")
-            else:
-                logger.info(f"Not posting {reddit_submission.id} to {lemmy_community.name}")
+
+
+@shared_task
+def push_updates_to_lemmy():
+    push_new_comments_to_lemmy()
+    push_new_submissions_to_lemmy()

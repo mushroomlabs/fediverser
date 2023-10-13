@@ -346,12 +346,11 @@ class RedditSubmission(TimeStampedModel):
         return reddit.submission(id=self.id)
 
     def post_to_lemmy(self, lemmy_community):
-        logger.info(f"Syncing reddit post {self.id} to {lemmy_community.name}")
         mirrored_post = LemmyMirroredPost.objects.filter(
             reddit_submission=self, lemmy_community=lemmy_community
         ).first()
         if mirrored_post is None:
-            logger.info(f"Creating post {self.id} on {lemmy_community.name}")
+            logger.info(f"Syncing reddit post {self.id} to {lemmy_community.name}")
             lemmy_client = self.author.make_lemmy_client()
             community_id = lemmy_client.discover_community(lemmy_community.fqdn)
             try:
@@ -393,13 +392,7 @@ class RedditSubmission(TimeStampedModel):
                 lemmy_community=lemmy_community,
             )
         for reddit_comment in self.comments.filter(parent=None).select_related("author"):
-            if not reddit_comment.should_be_mirrored:
-                continue
-
-            mirrored_comment = mirrored_post.comments.filter(reddit_comment=reddit_comment).first()
-
-            if mirrored_comment is None:
-                mirrored_comment = reddit_comment.make_mirror(mirrored_post)
+            reddit_comment.make_mirror(mirrored_post)
 
     @classmethod
     def make(cls, subreddit: RedditCommunity, post: praw.models.Submission):
@@ -470,55 +463,56 @@ class RedditComment(TimeStampedModel):
     def should_be_mirrored(self):
         return all(
             [
+                self.parent is None or self.parent.should_be_mirrored,
                 not self.marked_as_spam,
                 not self.stickied,
+                self.author is not None,
                 self.author is not None and not self.author.marked_as_bot,
                 self.author is not None and not self.author.marked_as_spammer,
                 not self.submission.marked_as_spam,
             ]
         )
 
-    def make_mirror(self, mirrored_post):
-        logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")
+    def make_mirror(self, mirrored_post, include_children=True):
+        lemmy_parent = (
+            self.parent and mirrored_post.comments.filter(reddit_comment=self.parent).first()
+        )
 
-        if mirrored_comment := self.lemmy_mirrored_comments.filter(
+        if self.parent is not None and lemmy_parent is None:
+            lemmy_parent = self.parent.make_mirror(mirrored_post, include_children=False)
+
+        mirrored_comment = self.lemmy_mirrored_comments.filter(
             lemmy_mirrored_post=mirrored_post
-        ).first():
-            logger.warning(f"Reddit comment {self.id} has already been mirrored")
-            return mirrored_comment
+        ).first()
 
-        lemmy_client = self.author.make_lemmy_client()
-        try:
-            language = LanguageType[self.language_code.upper()]
-            assert language in mirrored_post.lemmy_community.languages
-        except (KeyError, ValueError, AssertionError, AttributeError):
-            language = LanguageType.UNDETERMINED
+        if mirrored_comment is None:
+            logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")
+            lemmy_client = self.author.make_lemmy_client()
+            try:
+                language = LanguageType[self.language_code.upper()]
+                assert language in mirrored_post.lemmy_community.languages
+            except (KeyError, ValueError, AssertionError, AttributeError):
+                language = LanguageType.UNDETERMINED
 
-        lemmy_parent = None
+            params = dict(
+                post_id=mirrored_post.lemmy_post_id,
+                content=self.body,
+                language_id=language.value,
+                parent_id=lemmy_parent and lemmy_parent.id,
+            )
 
-        if self.parent:
-            lemmy_parent = LemmyMirroredComment.objects.filter(
-                lemmy_mirrored_post=mirrored_post, reddit_comment=self.parent
-            ).first() or self.parent.make_mirror(mirrored_post)
+            lemmy_comment = lemmy_client.comment.create(**params)
+            new_comment_id = lemmy_comment["comment_view"]["comment"]["id"]
 
-        params = dict(
-            post_id=mirrored_post.lemmy_post_id,
-            content=self.body,
-            language_id=language.value,
-            parent_id=lemmy_parent and lemmy_parent.id,
-        )
+            mirrored_comment = LemmyMirroredComment.objects.create(
+                lemmy_mirrored_post=mirrored_post,
+                reddit_comment=self,
+                lemmy_comment_id=new_comment_id,
+            )
 
-        lemmy_comment = lemmy_client.comment.create(**params)
-        new_comment_id = lemmy_comment["comment_view"]["comment"]["id"]
-
-        mirrored_comment = LemmyMirroredComment.objects.create(
-            lemmy_mirrored_post=mirrored_post,
-            reddit_comment=self,
-            lemmy_comment_id=new_comment_id,
-        )
-
-        for reply in self.children.all():
-            reply.make_mirror(mirrored_post)
+        if include_children:
+            for reply in self.children.all():
+                reply.make_mirror(mirrored_post, include_children=True)
 
         return mirrored_comment
 
