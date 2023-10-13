@@ -303,6 +303,7 @@ class RedditSubmission(TimeStampedModel):
                 not self.banned_at,
                 not self.quarantined,
                 not self.removed,
+                not self.is_cross_post,
                 self.url is not None and not self.url.startswith("https://twitter.com"),
                 self.url is not None and not self.url.startswith("https://x.com"),
                 not self.is_video_hosted_on_reddit,
@@ -345,10 +346,12 @@ class RedditSubmission(TimeStampedModel):
         return reddit.submission(id=self.id)
 
     def post_to_lemmy(self, lemmy_community):
+        logger.info(f"Syncing reddit post {self.id} to {lemmy_community.name}")
         mirrored_post = LemmyMirroredPost.objects.filter(
             reddit_submission=self, lemmy_community=lemmy_community
         ).first()
         if mirrored_post is None:
+            logger.info(f"Creating post {self.id} on {lemmy_community.name}")
             lemmy_client = self.author.make_lemmy_client()
             community_id = lemmy_client.discover_community(lemmy_community.fqdn)
             try:

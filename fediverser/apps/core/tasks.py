@@ -8,7 +8,6 @@ from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from .choices import AutomaticSubmissionPolicies
-from .exceptions import LemmyClientError
 from .models import (
     LemmyCommunity,
     LemmyCommunityInvite,
@@ -80,8 +79,6 @@ def mirror_reddit_comment(reddit_comment_id, mirrored_post_id):
         logger.exception("Reddit comment not found in database")
     except LemmyMirroredPost.DoesNotExist:
         logger.exception("Lemmy mirrored post not recorded")
-    except LemmyClientError:
-        logger.exception("Lemmy instance rejected comment")
 
 
 @shared_task
@@ -124,6 +121,8 @@ def update_all_subreddits():
 
 @shared_task
 def push_updates_to_lemmy():
+    NOW = timezone.now()
+
     NO_MIRROR_ALLOWED = AutomaticSubmissionPolicies.NONE
     submissions = (
         RedditSubmission.objects.filter()
@@ -133,14 +132,14 @@ def push_updates_to_lemmy():
     )
 
     unmapped = Q(subreddit__reddittolemmycommunity__isnull=True)
-
+    old_post = Q(created__lte=NOW - datetime.timedelta(days=1))
     automatic_mirror_disallowed = Q(
         subreddit__reddittolemmycommunity__automatic_submission_policy=NO_MIRROR_ALLOWED
     )
     from_spammer = Q(author__marked_as_spammer=True)
     from_bot = Q(author__marked_as_bot=True)
 
-    unpostable = unmapped | automatic_mirror_disallowed | from_spammer | from_bot
+    unpostable = unmapped | automatic_mirror_disallowed | from_spammer | from_bot | old_post
 
     for reddit_submission in submissions.exclude(unpostable):
         has_mirrors = reddit_submission.mirrors > 0
@@ -163,4 +162,9 @@ def push_updates_to_lemmy():
 
         for lemmy_community in lemmy_communities:
             if lemmy_community.can_accept_automatic_submission(reddit_submission):
-                reddit_submission.post_to_lemmy(lemmy_community)
+                try:
+                    reddit_submission.post_to_lemmy(lemmy_community)
+                except Exception:
+                    logger.exception(f"Failed to post {reddit_submission.id}")
+            else:
+                logger.info(f"Not posting {reddit_submission.id} to {lemmy_community.name}")
