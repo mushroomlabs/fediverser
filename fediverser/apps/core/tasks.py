@@ -114,7 +114,12 @@ def push_new_comments_to_lemmy():
     for comment in comments_pending:
         if comment.should_be_mirrored:
             for mirrored_post in comment.submission.lemmy_mirrored_posts.all():
-                comment.make_mirror(mirrored_post=mirrored_post, include_children=False)
+                try:
+                    community_name = mirrored_post.lemmy_community.name
+                    comment.make_mirror(mirrored_post=mirrored_post, include_children=False)
+                    logger.info(f"Posted comment {comment.id} on {community_name}")
+                except Exception:
+                    logger.exception(f"Failed to mirror comment {comment.id} to {community_name}")
 
 
 @shared_task
