@@ -394,6 +394,9 @@ class RedditSubmission(TimeStampedModel):
                 lemmy_community=lemmy_community,
             )
         for reddit_comment in self.comments.filter(parent=None).select_related("author"):
+            if not reddit_comment.should_be_mirrored:
+                continue
+
             mirrored_comment = mirrored_post.comments.filter(reddit_comment=reddit_comment).first()
 
             if mirrored_comment is None:
@@ -476,8 +479,15 @@ class RedditComment(TimeStampedModel):
             ]
         )
 
-    def make_mirror(self, mirrored_post, lemmy_parent_id=None):
+    def make_mirror(self, mirrored_post):
         logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")
+
+        if mirrored_comment := self.lemmy_mirrored_comments.filter(
+            lemmy_mirrored_post=mirrored_post
+        ).first():
+            logger.warning(f"Reddit comment {self.id} has already been mirrored")
+            return mirrored_comment
+
         lemmy_client = self.author.make_lemmy_client()
         try:
             language = LanguageType[self.language_code.upper()]
@@ -485,11 +495,18 @@ class RedditComment(TimeStampedModel):
         except (KeyError, ValueError, AssertionError, AttributeError):
             language = LanguageType.UNDETERMINED
 
+        lemmy_parent = None
+
+        if self.parent:
+            lemmy_parent = LemmyMirroredComment.objects.filter(
+                lemmy_mirrored_post=mirrored_post, reddit_comment=self.parent
+            ).first() or self.parent.make_mirror(mirrored_post)
+
         params = dict(
             post_id=mirrored_post.lemmy_post_id,
             content=self.body,
             language_id=language.value,
-            parent_id=lemmy_parent_id,
+            parent_id=lemmy_parent and lemmy_parent.id,
         )
 
         lemmy_comment = lemmy_client.comment.create(**params)
@@ -506,7 +523,7 @@ class RedditComment(TimeStampedModel):
         )
 
         for reply in self.children.all():
-            reply.make_mirror(mirrored_post, lemmy_parent_id=new_comment_id)
+            reply.make_mirror(mirrored_post)
 
         return mirrored_comment
 

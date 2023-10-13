@@ -4,9 +4,10 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
+from .choices import AutomaticSubmissionPolicies
 from .exceptions import LemmyClientError
 from .models import (
     LemmyCommunity,
@@ -73,15 +74,7 @@ def mirror_reddit_comment(reddit_comment_id, mirrored_post_id):
     try:
         comment = RedditComment.objects.get(id=reddit_comment_id)
         mirrored_post = LemmyMirroredPost.objects.get(id=mirrored_post_id)
-
-        lemmy_parent_comment = (
-            comment.parent and mirrored_post.comments.filter(reddit_comment=comment.parent).first()
-        )
-
-        comment.make_mirror(
-            mirrored_post=mirrored_post,
-            lemmy_parent_id=lemmy_parent_comment and lemmy_parent_comment.id,
-        )
+        comment.make_mirror(mirrored_post=mirrored_post)
 
     except RedditComment.DoesNotExist:
         logger.exception("Reddit comment not found in database")
@@ -127,3 +120,47 @@ def fetch_new_comments():
 def update_all_subreddits():
     for subreddit_name in RedditCommunity.objects.values_list("name", flat=True):
         fetch_new_posts.delay(subreddit_name=subreddit_name)
+
+
+@shared_task
+def push_updates_to_lemmy():
+    NO_MIRROR_ALLOWED = AutomaticSubmissionPolicies.NONE
+    submissions = (
+        RedditSubmission.objects.filter()
+        .annotate(mirrors=Count("lemmy_mirrored_posts"))
+        .annotate(latest_comment=Max("comments__created"))
+        .annotate(latest_mirror=Max("lemmy_mirrored_posts__comments__created"))
+    )
+
+    unmapped = Q(subreddit__reddittolemmycommunity__isnull=True)
+
+    automatic_mirror_disallowed = Q(
+        subreddit__reddittolemmycommunity__automatic_submission_policy=NO_MIRROR_ALLOWED
+    )
+    from_spammer = Q(author__marked_as_spammer=True)
+    from_bot = Q(author__marked_as_bot=True)
+
+    unpostable = unmapped | automatic_mirror_disallowed | from_spammer | from_bot
+
+    for reddit_submission in submissions.exclude(unpostable):
+        has_mirrors = reddit_submission.mirrors > 0
+        last_commented_at = reddit_submission.latest_comment
+        last_mirrored_at = reddit_submission.latest_mirror
+
+        if not reddit_submission.can_be_submitted_automatically:
+            continue
+
+        if last_commented_at is None and has_mirrors:
+            continue
+
+        if last_commented_at is not None and last_mirrored_at is not None:
+            if last_commented_at <= last_mirrored_at:
+                continue
+
+        lemmy_communities = LemmyCommunity.objects.filter(
+            reddittolemmycommunity__subreddit=reddit_submission.subreddit
+        )
+
+        for lemmy_community in lemmy_communities:
+            if lemmy_community.can_accept_automatic_submission(reddit_submission):
+                reddit_submission.post_to_lemmy(lemmy_community)
