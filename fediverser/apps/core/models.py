@@ -25,7 +25,6 @@ from pythorhead.types import LanguageType
 from fediverser.apps.lemmy import models as lemmy_models
 
 from .choices import AutomaticCommentPolicies, AutomaticSubmissionPolicies
-from .exceptions import LemmyClientError
 
 logger = logging.getLogger(__name__)
 
@@ -234,9 +233,6 @@ class RedditAccount(models.Model):
             return LEMMY_CLIENTS[self.username]
 
         lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
-
-        if lemmy_mirror is None:
-            raise LemmyClientError("Lemmy Mirror instance is not available or not configured")
 
         lemmy_client = lemmy_mirror._get_client()
         lemmy_client.log_in(self.username, self.password)
@@ -510,10 +506,6 @@ class RedditComment(TimeStampedModel):
         )
 
         lemmy_comment = lemmy_client.comment.create(**params)
-
-        if lemmy_comment is None:
-            raise LemmyClientError("Failed to create comment")
-
         new_comment_id = lemmy_comment["comment_view"]["comment"]["id"]
 
         mirrored_comment = LemmyMirroredComment.objects.create(

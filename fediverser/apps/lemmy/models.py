@@ -332,7 +332,7 @@ class Instance(models.Model):
         return self.domain
 
     def _get_client(self):
-        return Lemmy(f"https://{self.domain}")
+        return Lemmy(f"https://{self.domain}", raise_exceptions=True)
 
     @classmethod
     def get_reddit_mirror(cls):
