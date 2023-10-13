@@ -40,13 +40,22 @@ class RedditCommunityAdmin(admin.ModelAdmin):
 
 @admin.register(models.RedditAccount)
 class RedditAccountAdmin(admin.ModelAdmin):
-    list_display = ("username", "marked_as_spammer", "rejected_invite")
+    list_display = ("username", "marked_as_spammer", "marked_as_bot", "rejected_invite")
+    list_filter = ("marked_as_spammer", "marked_as_bot")
     search_fields = ("username",)
-    actions = ("create_lemmy_mirror", "mark_as_spammer")
+    actions = ("create_lemmy_mirror", "mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
 
-    @admin.action(description="Flag as Spammer account")
+    @admin.action(description="Flag as spammer")
     def mark_as_spammer(self, request, queryset):
         return queryset.update(marked_as_spammer=True)
+
+    @admin.action(description="Un-flag as spammer")
+    def unflag_as_spammer(self, request, queryset):
+        return queryset.update(marked_as_spammer=False)
+
+    @admin.action(description="Mark as bot account")
+    def mark_as_bot(self, request, queryset):
+        return queryset.update(marked_as_bot=True)
 
     @admin.action(description="Create account on Lemmy Mirror Instance")
     def create_lemmy_mirror(self, request, queryset):
