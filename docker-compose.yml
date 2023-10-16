@@ -145,15 +145,18 @@ services:
     restart: always
 
   lemmy-pictrs:
-    image: asonix/pictrs:0.4.0-rc.3
+    image: asonix/pictrs:0.4.5
     user: 991:991
     environment:
       PICTRS__API_KEY: pictrs_pass
       RUST_BACKTRACE: full
+      PICTRS__MEDIA__FORMAT: webp
+      PICTRS__MEDIA__ENABLE_FULL_VIDEO: "true"
       PICTRS__MEDIA__VIDEO_CODEC: vp9
       PICTRS__MEDIA__GIF__MAX_WIDTH: 1920
       PICTRS__MEDIA__GIF__MAX_HEIGHT: 1080
-      PICTRS__MEDIA__GIF__MAX_FRAME_COUNT: 200
+      PICTRS__MEDIA__GIF__MAX_AREA: 2073600
+      PICTRS__MEDIA__GIF__MAX_FRAME_COUNT: 1800
       PICTRS__STORE__TYPE: object_storage
       PICTRS__STORE__ENDPOINT: "http://lemmy-minio:9000"
       PICTRS__STORE__BUCKET_NAME: "lemmy-media"

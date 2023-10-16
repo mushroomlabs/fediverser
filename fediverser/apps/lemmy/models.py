@@ -347,6 +347,9 @@ class Language(models.Model):
     code = models.CharField(max_length=3)
     name = models.TextField()
 
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
     class Meta:
         managed = False
         db_table = "language"

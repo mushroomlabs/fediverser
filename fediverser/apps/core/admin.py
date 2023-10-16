@@ -1,7 +1,8 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import Count
 
 from . import models, tasks
+from .exceptions import LemmyClientRateLimited, RejectedComment
 
 
 class ReadOnlyMixin:
@@ -84,26 +85,25 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
         "subreddit",
         "author",
         "url",
+        "status",
         "total_comments",
-        "quarantined",
-        "removed",
-        "over_18",
         "is_spam",
         "is_duplicate",
     )
     list_filter = (
         "subreddit",
+        "status",
         "quarantined",
         "removed",
-        "over_18",
         "marked_as_spam",
         "marked_as_duplicate",
     )
     list_select_related = ("subreddit", "author")
-    search_fields = ("title",)
+    search_fields = ("id", "title")
     actions = (
         "fetch_from_reddit",
         "post_to_lemmy",
+        "post_comments_to_lemmy",
         "send_invite_to_post_author",
         "mark_as_spam",
         "mark_as_duplicate",
@@ -136,17 +136,38 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
                 subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
             )
 
-    @admin.action(description="Post to Mirror Communities")
+    @admin.action(description="Post Submission to Lemmy")
     def post_to_lemmy(self, request, queryset):
         for reddit_submission in queryset:
-            lemmy_community_ids = models.LemmyCommunity.objects.filter(
+            for community in models.LemmyCommunity.objects.filter(
                 reddittolemmycommunity__subreddit=reddit_submission.subreddit
-            ).values_list("id", flat=True)
-            for lemmy_community_id in lemmy_community_ids:
-                tasks.mirror_reddit_submission.delay(
-                    reddit_submission_id=reddit_submission.id,
-                    lemmy_community_id=lemmy_community_id,
-                )
+            ):
+                try:
+                    reddit_submission.post_to_lemmy(community)
+                except Exception as exc:
+                    messages.error(
+                        request,
+                        f"Failed to post {reddit_submission.id} to {community.name}: {exc}",
+                    )
+
+    @admin.action(description="Post comments to Lemmy")
+    def post_comments_to_lemmy(self, request, queryset):
+        for reddit_submission in queryset:
+            for mirrored_post in reddit_submission.lemmy_mirrored_posts.all():
+                for comment in reddit_submission.comments.filter(parent=None):
+                    try:
+                        comment.make_mirror(mirrored_post=mirrored_post, include_children=True)
+                    except RejectedComment as exc:
+                        messages.warning(
+                            request,
+                            f"Failed to post {comment.id}: {exc}",
+                        )
+                        comment.status = models.RedditComment.STATUS.rejected
+                        comment.save()
+
+                    except LemmyClientRateLimited:
+                        messages.warning("Stop due to being rate-limit")
+                        return
 
     @admin.action(description="Send invite to author")
     def send_invite_to_post_author(self, request, queryset):
@@ -174,8 +195,9 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
 class RedditCommentAdmin(ReadOnlyMixin, admin.ModelAdmin):
     date_hierarchy = "created"
     list_display = ("submission_id", "author", "body", "is_spam")
-    list_filter = ("distinguished", "marked_as_spam")
+    list_filter = ("distinguished", "marked_as_spam", "status")
     actions = ("mark_as_spam", "mark_as_ham")
+    search_fields = ("id", "body")
 
     def is_spam(self, obj):
         return obj.marked_as_spam
@@ -197,3 +219,17 @@ class LemmyCommunityInviteTemplateAdmin(admin.ModelAdmin):
     list_display = ("subreddit", "lemmy_community")
     list_filter = ("subreddit", "lemmy_community")
     autocomplete_fields = ("subreddit", "lemmy_community")
+
+
+@admin.register(models.LemmyMirroredComment)
+class LemmyMirroredCommentAdmin(admin.ModelAdmin):
+    list_display = ("reddit_comment_id", "lemmy_comment_id", "lemmy_community")
+    list_select_related = ("lemmy_mirrored_post", "lemmy_mirrored_post__lemmy_community")
+    list_filter = ("lemmy_mirrored_post__lemmy_community",)
+    search_fields = ("reddit_comment_id", "lemmy_comment_id")
+
+    def lemmy_community(self, obj):
+        return obj.lemmy_mirrored_post.lemmy_community
+
+    def has_change_permission(self, request, obj=None):
+        return False

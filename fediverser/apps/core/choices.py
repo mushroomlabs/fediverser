@@ -1,4 +1,5 @@
 from django.db.models import TextChoices
+from model_utils import Choices
 
 
 class AutomaticSubmissionPolicies(TextChoices):
@@ -13,3 +14,6 @@ class AutomaticCommentPolicies(TextChoices):
     LINK_ONLY = ("Link Only", "Mirror comment threads for external links")
     SELF_POST_ONLY = ("Self Only", "Mirror comment threads for self-posts")
     FULL = ("Full", "Mirror all comment threads")
+
+
+SOURCE_CONTENT_STATUSES = Choices("retrieved", "rejected", "failed", "mirrored")

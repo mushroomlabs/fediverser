@@ -1,17 +1,22 @@
 import datetime
 import logging
+import time
+from contextlib import contextmanager
 
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
 from .choices import AutomaticSubmissionPolicies
+from .exceptions import LemmyClientRateLimited, RejectedComment
 from .models import (
     LemmyCommunity,
     LemmyCommunityInvite,
     LemmyCommunityInviteTemplate,
+    LemmyMirroredComment,
     RedditAccount,
     RedditComment,
     RedditCommunity,
@@ -20,6 +25,27 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def task_mutex(task_key, ttl=30 * 60):
+    timeout_at = time.monotonic() + ttl
+    status = cache.add(task_key, timeout_at, ttl)
+    try:
+        yield status
+    finally:
+        if time.monotonic() < timeout_at and status:
+            cache.delete(task_key)
+
+
+@shared_task
+def clone_redditor(reddit_username):
+    try:
+        reddit_account = RedditAccount.objects.get(username=reddit_username)
+        reddit_account.register_mirror()
+    except RedditAccount.DoesNotExist:
+        logger.warning("Could not find reddit account")
+        return
 
 
 def send_lemmy_community_invite_to_redditor(redditor_name: str, subreddit_name: str):
@@ -55,69 +81,59 @@ def send_lemmy_community_invite_to_redditor(redditor_name: str, subreddit_name: 
 
 
 @shared_task
-def mirror_reddit_submission(reddit_submission_id, lemmy_community_id):
-    try:
-        reddit_submission = RedditSubmission.objects.get(id=reddit_submission_id)
-        lemmy_community = LemmyCommunity.objects.get(id=lemmy_community_id)
-
-        reddit_submission.post_to_lemmy(lemmy_community)
-    except RedditSubmission.DoesNotExist:
-        logger.exception("Reddit Submission not found in database")
-    except LemmyCommunity.DoesNotExist:
-        logger.exception("Lemmy Community not recorded")
-
-
-@shared_task
 def fetch_new_posts(subreddit_name):
-    NOW = timezone.now()
-    THRESHOLD = NOW - datetime.timedelta(hours=12)
-
+    client = make_reddit_client()
     try:
         subreddit = RedditCommunity.objects.get(name=subreddit_name)
-        latest_run = subreddit.most_recent_post or THRESHOLD
-        for post in [p for p in subreddit.new() if p.created_utc > latest_run.timestamp()]:
+
+        most_recent_post = subreddit.most_recent_post
+        posts = [p for p in client.subreddit(subreddit.name).new()]
+
+        if most_recent_post is not None:
+            posts = [p for p in posts if p.created_utc > most_recent_post.timestamp()]
+
+        for post in posts:
             RedditSubmission.make(subreddit=subreddit, post=post)
+
     except RedditCommunity.DoesNotExist:
         logger.warning("Subreddit not found", extra={"name": subreddit_name})
 
 
 @shared_task
-def fetch_new_comments():
-    NOW = timezone.now()
-
-    mirrored_submissions = RedditSubmission.objects.filter(
-        lemmy_mirrored_posts__isnull=False
-    ).annotate(most_recent_mirrored_comment=Max("lemmy_mirrored_posts__comments__modified"))
-
-    old_post = Q(created__lte=NOW - datetime.timedelta(hours=12))
-    new_post = Q(created__gte=NOW - datetime.timedelta(minutes=3))
-    fresh_comment = Q(most_recent_mirrored_comment__gte=NOW - datetime.timedelta(minutes=3))
-
-    for reddit_submission in mirrored_submissions.exclude(old_post | new_post | fresh_comment):
-        RedditSubmission.make(
-            subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
+def push_new_comments_to_lemmy():
+    for subreddit in RedditCommunity.objects.filter(reddittolemmycommunity__isnull=False):
+        mirrored_comments = LemmyMirroredComment.objects.filter(
+            lemmy_mirrored_post__reddit_submission__subreddit=subreddit
         )
 
+        most_recent = mirrored_comments.aggregate(most_recent=Max("created")).get("most_recent")
+        threshold = most_recent or timezone.now() - datetime.timedelta(minutes=10)
+        candidates = RedditComment.objects.filter(
+            created__gte=threshold,
+            submission__subreddit=subreddit,
+            status=RedditComment.STATUS.retrieved,
+        )
 
-@shared_task
-def update_all_subreddits():
-    for subreddit_name in RedditCommunity.objects.values_list("name", flat=True):
-        fetch_new_posts.delay(subreddit_name=subreddit_name)
+        with_mirrored_submissions = Q(submission__lemmy_mirrored_posts__isnull=False)
+        no_pending_parent = Q(parent=None) | Q(parent__status=RedditComment.STATUS.mirrored)
 
+        comments_pending = candidates.filter(with_mirrored_submissions).filter(no_pending_parent)
 
-@shared_task
-def push_new_comments_to_lemmy():
-    comments_pending = RedditComment.objects.filter(
-        submission__lemmy_mirrored_posts__isnull=False, lemmy_mirrored_comments__isnull=True
-    ).select_related("parent")
-
-    for comment in comments_pending:
-        if comment.should_be_mirrored:
+        for comment in comments_pending.distinct().iterator():
             for mirrored_post in comment.submission.lemmy_mirrored_posts.all():
                 try:
                     community_name = mirrored_post.lemmy_community.name
                     comment.make_mirror(mirrored_post=mirrored_post, include_children=False)
-                    logger.info(f"Posted comment {comment.id} on {community_name}")
+
+                except RejectedComment as exc:
+                    logger.warning(f"Comment is rejected: {exc}")
+                    comment.status = RedditComment.STATUS.rejected
+                    comment.save()
+
+                except LemmyClientRateLimited:
+                    logger.warning("Too many requests. Will stop pushing submissions to Lemmy")
+                    return
+
                 except Exception:
                     logger.exception(f"Failed to mirror comment {comment.id} to {community_name}")
 
@@ -127,11 +143,6 @@ def push_new_submissions_to_lemmy():
     NOW = timezone.now()
 
     NO_MIRROR_ALLOWED = AutomaticSubmissionPolicies.NONE
-    submissions = (
-        RedditSubmission.objects.filter()
-        .annotate(latest_comment=Max("comments__created"))
-        .annotate(latest_mirror=Max("lemmy_mirrored_posts__comments__created"))
-    )
 
     unmapped = Q(subreddit__reddittolemmycommunity__isnull=True)
     old_post = Q(created__lte=NOW - datetime.timedelta(days=1))
@@ -142,7 +153,7 @@ def push_new_submissions_to_lemmy():
     from_spammer = Q(author__marked_as_spammer=True)
     from_bot = Q(author__marked_as_bot=True)
 
-    to_exclude = (
+    submissions = RedditSubmission.objects.exclude(
         unmapped
         | automatic_mirror_disallowed
         | from_spammer
@@ -151,16 +162,9 @@ def push_new_submissions_to_lemmy():
         | already_posted
     )
 
-    for reddit_submission in submissions.exclude(to_exclude):
-        last_commented_at = reddit_submission.latest_comment
-        last_mirrored_at = reddit_submission.latest_mirror
-
+    for reddit_submission in submissions.distinct():
         if not reddit_submission.can_be_submitted_automatically:
             continue
-
-        if last_commented_at is not None and last_mirrored_at is not None:
-            if last_commented_at <= last_mirrored_at:
-                continue
 
         lemmy_communities = LemmyCommunity.objects.filter(
             reddittolemmycommunity__subreddit=reddit_submission.subreddit
@@ -171,11 +175,71 @@ def push_new_submissions_to_lemmy():
                 try:
                     reddit_submission.post_to_lemmy(lemmy_community)
                     logger.info(f"Posted {reddit_submission.id} to {lemmy_community.name}")
+                except LemmyClientRateLimited:
+                    logger.warning("Too many requests. Will stop pushing submissions to Lemmy")
+                    return
                 except Exception:
                     logger.exception(f"Failed to post {reddit_submission.id}")
 
 
-@shared_task
-def push_updates_to_lemmy():
-    push_new_comments_to_lemmy()
-    push_new_submissions_to_lemmy()
+@shared_task(bind=True)
+def push_updates_to_lemmy(self):
+    with task_mutex(self.name) as lock_acquired:
+        if lock_acquired:
+            push_new_comments_to_lemmy()
+            push_new_submissions_to_lemmy()
+        else:
+            logger.warning("Could not get lock. Skipping this run")
+
+
+@shared_task(bind=True)
+def pull_from_reddit(self):
+    client = make_reddit_client()
+
+    subreddit_names = RedditCommunity.objects.values_list("name", flat=True)
+
+    def make_ancestor(comment, submission):
+        has_parent = comment.parent_id.startswith("t1_")
+        if not has_parent:
+            return None
+
+        parent_comment_id = comment.parent_id.split("_", 1)[-1]
+
+        reddit_parent_comment = RedditComment.objects.filter(id=parent_comment_id).first()
+        if reddit_parent_comment is not None:
+            return reddit_parent_comment
+
+        parent_comment = client.comment(parent_comment_id)
+        grandparent = make_ancestor(parent_comment, submission)
+        return RedditComment.make(submission, comment=parent_comment, parent=grandparent)
+
+    with task_mutex(self.name) as lock_acquired:
+        if lock_acquired:
+            all_subreddits = "+".join(subreddit_names)
+            comments = [c for c in client.subreddit(all_subreddits).comments()]
+
+            comment_ids = set([c.id for c in comments])
+
+            already_processed = RedditComment.objects.filter(id__in=comment_ids).values_list(
+                "id", flat=True
+            )
+            new_comments = [c for c in comments if c.id not in already_processed]
+
+            for comment in new_comments:
+                try:
+                    subreddit = RedditCommunity.objects.get(
+                        name__iexact=comment.subreddit.display_name
+                    )
+                except Exception:
+                    breakpoint()
+                reddit_submission = RedditSubmission.objects.filter(
+                    id=comment.submission.id
+                ).first()
+                if reddit_submission is None:
+                    post = client.submission(comment.submission.id)
+                    RedditSubmission.make(subreddit=subreddit, post=post)
+                    continue
+                parent = make_ancestor(comment, reddit_submission)
+                RedditComment.make(submission=reddit_submission, comment=comment, parent=parent)
+        else:
+            logger.warning("Could not get lock, skipping this run")

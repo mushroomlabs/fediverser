@@ -10,7 +10,7 @@ import praw
 import requests
 from Crypto.PublicKey import RSA
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Max
 from django.db.utils import DataError
 from django.template.defaultfilters import slugify
@@ -18,13 +18,14 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
-from model_utils.models import TimeStampedModel
+from model_utils.models import StatusModel, TimeStampedModel
 from praw import Reddit
 from pythorhead.types import LanguageType
 
 from fediverser.apps.lemmy import models as lemmy_models
 
-from .choices import AutomaticCommentPolicies, AutomaticSubmissionPolicies
+from .choices import SOURCE_CONTENT_STATUSES, AutomaticCommentPolicies, AutomaticSubmissionPolicies
+from .exceptions import LemmyClientRateLimited, RejectedComment
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +154,16 @@ class RedditCommunity(models.Model):
     name = models.CharField(max_length=255, unique=True)
 
     @property
+    def comments(self):
+        return RedditComment.objects.filter(submission__subreddit=self)
+
+    @property
     def most_recent_post(self):
         return self.posts.aggregate(most_recent=Max("created")).get("most_recent")
+
+    @property
+    def most_recent_comment(self):
+        return self.comments.aggregate(most_recent=Max("created")).get("most_recent")
 
     @property
     def praw_object(self):
@@ -252,8 +261,26 @@ class RedditAccount(models.Model):
         return f"/u/{self.username}"
 
 
-class RedditSubmission(TimeStampedModel):
+class AbstractRedditItem(TimeStampedModel, StatusModel):
+    STATUS = SOURCE_CONTENT_STATUSES
     id = models.CharField(max_length=16, primary_key=True)
+
+    @property
+    def language_code(self):
+        raise NotImplementedError()
+
+    @property
+    def language(self):
+        try:
+            return self.language_code and LanguageType[self.language_code.upper()]
+        except (KeyError, AttributeError, LangDetectException):
+            return LanguageType.UNDETERMINED
+
+    class Meta:
+        abstract = True
+
+
+class RedditSubmission(AbstractRedditItem):
     subreddit = models.ForeignKey(RedditCommunity, related_name="posts", on_delete=models.CASCADE)
     author = models.ForeignKey(
         RedditAccount, null=True, related_name="posts", on_delete=models.SET_NULL
@@ -353,16 +380,17 @@ class RedditSubmission(TimeStampedModel):
             logger.info(f"Syncing reddit post {self.id} to {lemmy_community.name}")
             lemmy_client = self.author.make_lemmy_client()
             community_id = lemmy_client.discover_community(lemmy_community.fqdn)
-            try:
-                language = LanguageType[self.language_code.upper()]
-            except (KeyError, ValueError, LangDetectException):
-                language = LanguageType.UNDETERMINED
+            post_language = (
+                self.language
+                if self.language in lemmy_community.languages
+                else LanguageType.UNDETERMINED
+            )
 
             params = dict(
                 community_id=community_id,
                 name=self.title,
                 nsfw=self.over_18,
-                language_id=language.value,
+                language_id=post_language.value,
             )
 
             if not self.is_self_post:
@@ -385,19 +413,36 @@ class RedditSubmission(TimeStampedModel):
             if self.has_self_text:
                 params["body"] = self.selftext
 
-            lemmy_post = lemmy_client.post.create(**params)
-            mirrored_post = LemmyMirroredPost.objects.create(
-                reddit_submission=self,
-                lemmy_post_id=lemmy_post["post_view"]["post"]["id"],
-                lemmy_community=lemmy_community,
-            )
-        for reddit_comment in self.comments.filter(parent=None).select_related("author"):
-            reddit_comment.make_mirror(mirrored_post)
+            with transaction.atomic():
+                try:
+                    lemmy_post = lemmy_client.post.create(**params)
+                    mirrored_post = LemmyMirroredPost.objects.create(
+                        reddit_submission=self,
+                        lemmy_post_id=lemmy_post["post_view"]["post"]["id"],
+                        lemmy_community=lemmy_community,
+                    )
+                    self.status = self.STATUS.mirrored
+                except Exception as exc:
+                    if "rate_limit_error" in str(exc):
+                        raise LemmyClientRateLimited()
+                    else:
+                        self.status = self.STATUS.failed
+                        logger.info(f"Failed to post {self.id}: {exc}")
+                self.save()
+
+        return mirrored_post
 
     @classmethod
     def make(cls, subreddit: RedditCommunity, post: praw.models.Submission):
         def get_date(timestamp):
             return timestamp and make_aware(datetime.datetime.fromtimestamp(timestamp))
+
+        def make_comment_thread(submission, comment: praw.models.Comment, parent=None):
+            reddit_comment = RedditComment.make(
+                submission=submission, comment=comment, parent=parent
+            )
+            for reply in comment.replies:
+                make_comment_thread(submission=submission, comment=reply, parent=reddit_comment)
 
         logger.info(f"Syncing reddit post {post.id}")
 
@@ -424,7 +469,8 @@ class RedditSubmission(TimeStampedModel):
             )
             post.comments.replace_more(limit=None)
             for comment in post.comments:
-                RedditComment.make(submission=submission, comment=comment)
+                make_comment_thread(submission=submission, comment=comment, parent=None)
+            return submission
         except DataError:
             logger.warning("Failed to make reddit submission", extra={"post_url": post.url})
 
@@ -432,8 +478,8 @@ class RedditSubmission(TimeStampedModel):
         return f"{self.url} ({self.subreddit})"
 
 
-class RedditComment(TimeStampedModel):
-    id = models.CharField(max_length=16, primary_key=True)
+class RedditComment(AbstractRedditItem):
+    MAXIMUM_AGE_FOR_MIRRORING = datetime.timedelta(days=1)
     submission = models.ForeignKey(
         RedditSubmission, related_name="comments", on_delete=models.CASCADE
     )
@@ -460,26 +506,24 @@ class RedditComment(TimeStampedModel):
         return self.body and detect(self.body)
 
     @property
-    def should_be_mirrored(self):
-        return all(
-            [
-                self.parent is None or self.parent.should_be_mirrored,
-                not self.marked_as_spam,
-                not self.stickied,
-                self.author is not None,
-                self.author is not None and not self.author.marked_as_bot,
-                self.author is not None and not self.author.marked_as_spammer,
-                not self.submission.marked_as_spam,
-            ]
-        )
+    def age(self):
+        return timezone.now() - self.created
 
     def make_mirror(self, mirrored_post, include_children=True):
-        lemmy_parent = (
-            self.parent and mirrored_post.comments.filter(reddit_comment=self.parent).first()
-        )
-
-        if self.parent is not None and lemmy_parent is None:
-            lemmy_parent = self.parent.make_mirror(mirrored_post, include_children=False)
+        try:
+            no_missing_parent = self.parent is None or self.parent.status == self.STATUS.mirrored
+            assert no_missing_parent, "Parent comment is not mirrored"
+            assert self.age <= self.MAXIMUM_AGE_FOR_MIRRORING, "Comment is too old"
+            assert not self.marked_as_spam, "Comment is marked as spam"
+            assert not self.stickied, "Sticked comments only make sense for reddit"
+            assert self.author is not None, "Author is unknown"
+            assert not self.author.marked_as_bot, "Author is marked as bot"
+            assert not self.author.marked_as_spammer, "Author is marked as spammer"
+            assert not self.submission.marked_as_spam, "Submission has been marked as spam"
+        except AssertionError as exc:
+            self.status = self.STATUS.rejected
+            self.save()
+            raise RejectedComment(str(exc))
 
         mirrored_comment = self.lemmy_mirrored_comments.filter(
             lemmy_mirrored_post=mirrored_post
@@ -488,27 +532,41 @@ class RedditComment(TimeStampedModel):
         if mirrored_comment is None:
             logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")
             lemmy_client = self.author.make_lemmy_client()
-            try:
-                language = LanguageType[self.language_code.upper()]
-                assert language in mirrored_post.lemmy_community.languages
-            except (KeyError, ValueError, AssertionError, AttributeError):
-                language = LanguageType.UNDETERMINED
+            post_language = self.language
+            if self.language not in mirrored_post.lemmy_community.languages:
+                post_language = LanguageType.UNDETERMINED
+
+            lemmy_parent = (
+                self.parent and mirrored_post.comments.filter(reddit_comment=self.parent).first()
+            )
 
             params = dict(
                 post_id=mirrored_post.lemmy_post_id,
                 content=self.body,
-                language_id=language.value,
-                parent_id=lemmy_parent and lemmy_parent.id,
+                language_id=post_language.value,
+                parent_id=lemmy_parent and lemmy_parent.lemmy_comment_id,
             )
 
-            lemmy_comment = lemmy_client.comment.create(**params)
-            new_comment_id = lemmy_comment["comment_view"]["comment"]["id"]
+            with transaction.atomic():
+                try:
+                    lemmy_comment = lemmy_client.comment.create(**params)
+                except Exception as exc:
+                    if "rate_limit_error" in str(exc):
+                        raise LemmyClientRateLimited()
 
-            mirrored_comment = LemmyMirroredComment.objects.create(
-                lemmy_mirrored_post=mirrored_post,
-                reddit_comment=self,
-                lemmy_comment_id=new_comment_id,
-            )
+                    lemmy_comment = None
+                    self.status = self.STATUS.failed
+                    logger.info(f"Failed to post {self.id}: {exc}")
+                else:
+                    new_comment_id = lemmy_comment["comment_view"]["comment"]["id"]
+
+                    mirrored_comment = LemmyMirroredComment.objects.create(
+                        lemmy_mirrored_post=mirrored_post,
+                        reddit_comment=self,
+                        lemmy_comment_id=new_comment_id,
+                    )
+                    self.status = self.STATUS.mirrored
+                self.save()
 
         if include_children:
             for reply in self.children.all():
@@ -543,8 +601,7 @@ class RedditComment(TimeStampedModel):
                 "created": make_aware(datetime.datetime.fromtimestamp(comment.created_utc)),
             },
         )
-        for reply in comment.replies:
-            cls.make(submission=submission, parent=reddit_comment, comment=reply)
+        return reddit_comment
 
 
 class RedditToLemmyCommunity(models.Model):
@@ -598,7 +655,10 @@ class LemmyMirroredPost(TimeStampedModel):
     )
 
     class Meta:
-        unique_together = ("reddit_submission", "lemmy_post_id")
+        unique_together = (
+            ("reddit_submission", "lemmy_post_id"),
+            ("reddit_submission", "lemmy_community"),
+        )
 
 
 class LemmyMirroredComment(TimeStampedModel):

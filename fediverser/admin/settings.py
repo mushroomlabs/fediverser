@@ -187,20 +187,18 @@ LOGGING = {
     "handlers": LOGGING_HANDLERS,
     "loggers": {
         "django": {"handlers": ["null"], "propagate": True, "level": "INFO"},
-        "django.db.backends:": {
-            "handlers": LOGGING_HANDLER_METHODS,
-            "level": "ERROR",
-            "propagate": False,
-        },
-        "django.request": {
-            "handlers": LOGGING_HANDLER_METHODS,
-            "level": "ERROR",
-            "propagate": False,
-        },
     },
 }
 
+# External libraries that we want to have logs
+for module in ("django.request", "praw", "prawcore"):
+    LOGGING["loggers"][module] = {
+        "handlers": LOGGING_HANDLER_METHODS,
+        "level": LOG_LEVEL,
+        "propagate": False,
+    }
 
+# Set up loggers for our own apps
 for app in INTERNAL_APPS:
     LOGGING["loggers"][app] = {
         "handlers": LOGGING_HANDLER_METHODS,

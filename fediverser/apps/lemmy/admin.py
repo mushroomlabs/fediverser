@@ -41,3 +41,13 @@ class SiteAdmin(admin.ModelAdmin):
 @admin.register(models.LocalSite)
 class LocalSiteAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(models.Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ("post_id", "content", "language", "deleted", "local")
+    list_select_related = ("post",)
+    list_filter = ("deleted", "removed", "local", "distinguished", "language")
+
+    def has_change_permission(self, *args, **kw):
+        return False
