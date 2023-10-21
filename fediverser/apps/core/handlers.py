@@ -1,6 +1,6 @@
 import logging
 
-from allauth.socialaccount.signals import pre_social_login, social_account_added
+from allauth.socialaccount.signals import social_account_added
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -17,7 +17,6 @@ def on_reddit_account_created_make_mirror(sender, **kw):
         clone_redditor.delay(reddit_account.username)
 
 
-@receiver(pre_social_login)
 @receiver(social_account_added)
 def on_reddit_user_connected_account_update_lemmy_mirror(sender, **kw):
     social_login = kw["sociallogin"]
