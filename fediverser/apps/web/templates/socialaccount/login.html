@@ -1,0 +1,9 @@
+{% extends "web/base.tmpl.html" %}
+{% load web account i18n %}
+
+{% block main_contents %}
+<form method="post" action="{% url 'reddit_login' %}">
+  {% csrf_token %}
+  <button type="submit">Connect Reddit Account</button>
+</form>
+{% endblock %}

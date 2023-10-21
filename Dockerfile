@@ -1,5 +1,5 @@
 # Start with a Python image.
-FROM python:3.11 AS fediverser_base
+FROM python:3.11-slim-bookworm AS fediverser_base
 
 ENV PYTHONFAULTHANDLER=1 \
   PYTHONUNBUFFERED=1 \

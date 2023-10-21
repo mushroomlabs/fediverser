@@ -1,0 +1,54 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    {% block meta %}
+    <meta name="viewport" content="width=device-width">
+    {% endblock %}
+    {% block header_stylesheets %}
+    <link rel="stylesheet" type="text/css" href="{% static 'web/stylesheets/simple.min.css' %}">
+    {% endblock %}
+    {% block header_extra_js %}{% endblock %}
+    {% block header_extra_css %}{% endblock %}
+
+    <title>
+      {% block page_title %}
+      Fediverser: join the fediverse!
+      {% endblock %}
+    </title>
+  </head>
+  <body>
+    {% block body %}
+    <header>
+      <h2><a href="{% url 'web:home' %}">Fediverser Portal</a></h2>
+      {% block header %}
+      <nav role="navigation">
+        {% block navbar %}
+        {% if user.is_authenticated %}
+        <a href="{% url 'account_logout' %}">Sign Out</a>
+        {% endif %}
+        {% endblock %}
+      </nav>
+      {% endblock %}
+    </header>
+    <main>
+      {% block main_contents %}{% endblock %}
+    </main>
+    {% block footer %}
+    <footer>
+      {% block footer_contents %}
+      <section>
+        <h6><a href="{% url 'web:about'%}">About</a></h6>
+        <p>
+          Fediverser is an online tool that
+          can connect your different social media accounts to their corresponding <a href="https://fediverse.party" target="_blank">fediverse</a> applications.
+        </p>
+      </section>
+      {% endblock %}
+    </footer>
+    {% endblock %}
+    {% endblock %}
+  </body>
+  {% block body_extra_js %}{% endblock %}
+</html>

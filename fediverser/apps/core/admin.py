@@ -41,10 +41,17 @@ class RedditCommunityAdmin(admin.ModelAdmin):
 
 @admin.register(models.RedditAccount)
 class RedditAccountAdmin(admin.ModelAdmin):
-    list_display = ("username", "marked_as_spammer", "marked_as_bot", "rejected_invite")
+    list_display = (
+        "username",
+        "controller",
+        "marked_as_spammer",
+        "marked_as_bot",
+        "rejected_invite",
+    )
     list_filter = ("marked_as_spammer", "marked_as_bot")
     search_fields = ("username",)
     actions = ("create_lemmy_mirror", "mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
+    readonly_fields = ("controller", "username", "password")
 
     @admin.action(description="Flag as spammer")
     def mark_as_spammer(self, request, queryset):

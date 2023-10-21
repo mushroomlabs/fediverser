@@ -14,7 +14,6 @@ SECRET_KEY = env.str("FEDIVERSER_SECRET_KEY")
 DEBUG = env.bool("FEDIVERSER_DEBUG", default=False)
 TEST_MODE = "FEDIVERSER_TEST" in os.environ
 
-
 ALLOWED_HOSTS = ["*"]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -36,11 +35,16 @@ THIRD_PARTY_APPS = (
     "django_celery_beat",
     "django_celery_results",
     "django_extensions",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.reddit",
 )
 
 INTERNAL_APPS = (
     "fediverser.apps.core",
     "fediverser.apps.lemmy",
+    "fediverser.apps.web",
 )
 
 INSTALLED_APPS = INTERNAL_APPS + THIRD_PARTY_APPS + DJANGO_APPS
@@ -52,10 +56,14 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
+# This ensures that requests are seen as secure when the proxy sets the header
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 CORS_ALLOW_ALL_ORIGINS = True
-ROOT_URLCONF = env.str("FEDIVERSER_ROOT_URLCONF", default="fediverser.admin.urls")
+ROOT_URLCONF = env.str("FEDIVERSER_ROOT_URLCONF", default="fediverser.services.admin.urls")
 
 TEMPLATES = [
     {
@@ -74,7 +82,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "fediverser.admin.wsgi.application"
+WSGI_APPLICATION = "fediverser.services.base.wsgi.application"
 
 # Cache
 CACHES = {
@@ -110,11 +118,12 @@ DATABASES = {
         "PORT": env.str("LEMMY_DATABASE_PORT", default=5432),
     },
 }
-DATABASE_ROUTERS = ("fediverser.admin.database_router.InternalRouter",)
+DATABASE_ROUTERS = ("fediverser.services.base.database_router.InternalRouter",)
 
 # Authentication and Account Management
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 # Email
@@ -139,6 +148,37 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Reddit
+REDDIT_CLIENT_ID = env.str("FEDIVERSER_REDDIT_CLIENT_ID", default=None)
+REDDIT_CLIENT_SECRET = env.str("FEDIVERSER_REDDIT_CLIENT_SECRET", default=None)
+REDDIT_USER_AGENT = env.str("FEDIVERSER_REDDIT_USER_AGENT", default="fediverser/0.1.0")
+REDDIT_BOT_ACCOUNT_USERNAME = env.str("REDDIT_BOT_ACCOUNT_USERNAME", default=None)
+REDDIT_BOT_ACCOUNT_PASSWORD = env.str("REDDIT_BOT_ACCOUNT_PASSWORD", default=None)
+
+# Authentication with third-party providers
+
+LOGIN_REDIRECT_URL = "web:home"
+LOGIN_URL = "account_login"
+
+ACCOUNT_LOGOUT_ON_GET = True
+ACCOUNT_LOGIN_ON_PASSWORD_RESET = True
+ACCOUNT_EMAIL_REQUIRED = False
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_PRESERVE_USERNAME_CASING = False
+
+SOCIALACCOUNT_PROVIDERS = {
+    "reddit": {
+        "AUTH_PARAMS": {"duration": "permanent"},
+        "SCOPE": [
+            "identity",
+            "mysubreddits",
+            "privatemessages",
+            "read",
+            "submit",
+        ],
+        "USER_AGENT": env.str("FEDIVERSER_USER_AGENT", default=REDDIT_USER_AGENT),
+    }
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
@@ -207,13 +247,5 @@ for app in INTERNAL_APPS:
     }
 
 
-# Reddit
-REDDIT_CLIENT_ID = env.str("FEDIVERSER_REDDIT_CLIENT_ID", default=None)
-REDDIT_CLIENT_SECRET = env.str("FEDIVERSER_REDDIT_CLIENT_SECRET", default=None)
-REDDIT_USER_AGENT = env.str("FEDIVERSER_REDDIT_USER_AGENT", default="fediverser/0.1.0")
-REDDIT_BOT_ACCOUNT_USERNAME = env.str("REDDIT_BOT_ACCOUNT_USERNAME", default=None)
-REDDIT_BOT_ACCOUNT_PASSWORD = env.str("REDDIT_BOT_ACCOUNT_PASSWORD", default=None)
-
 # Lemmy
-
 LEMMY_MIRROR_INSTANCE_DOMAIN = env.str("FEDIVERSER_LEMMY_MIRROR_INSTANCE", default=None)

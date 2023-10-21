@@ -10,6 +10,7 @@ import praw
 import requests
 from Crypto.PublicKey import RSA
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Max
 from django.db.utils import DataError
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 LEMMY_CLIENTS = {}
+User = get_user_model()
 
 
 def make_reddit_client(**kw):
@@ -182,6 +184,7 @@ class RedditCommunity(models.Model):
 
 
 class RedditAccount(models.Model):
+    controller = models.OneToOneField(User, null=True, blank=True, on_delete=models.SET_NULL)
     username = models.CharField(unique=True, max_length=60)
     password = models.CharField(
         max_length=64, default=make_password, help_text="Password for Lemmy mirror instance"
@@ -191,10 +194,25 @@ class RedditAccount(models.Model):
     marked_as_bot = models.BooleanField(default=False)
 
     @property
+    def is_initial_password_in_use(self):
+        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        if lemmy_mirror is None:
+            logger.warning("Lemmy Mirror instance is not properly configured")
+            return False
+
+        try:
+            lemmy_user = lemmy_models.LocalUser.objects.get(person__name=self.username)
+            return bcrypt.checkpw(self.password.encode(), lemmy_user.password_encrypted.encode())
+        except lemmy_models.LocalUser.DoesNotExist:
+            logger.warning(f"Lemmy Mirror does not have user {self.username}")
+            return False
+
+    @property
     def can_send_invite(self):
         now = timezone.now()
         return all(
             [
+                self.controller is None,
                 not self.rejected_invite,
                 not self.marked_as_spammer,
                 not self.invites.filter(created__gte=now - datetime.timedelta(days=7)).exists(),
@@ -221,7 +239,7 @@ class RedditAccount(models.Model):
                 "published": timezone.now(),
                 "last_refreshed_at": timezone.now(),
                 "local": True,
-                "bot_account": True,
+                "bot_account": self.controller is None,
                 "deleted": False,
                 "banned": False,
                 "admin": False,

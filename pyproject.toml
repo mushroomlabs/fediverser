@@ -1,6 +1,6 @@
 [tool.black]
 line-length = 99
-target-version = ['py310']
+target-version = ['py310', 'py311']
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -13,12 +13,13 @@ exclude = '''
 '''
 
 [tool.isort]
-py_version = 310
+py_version = 311
 line_length = 99
 default_section = "THIRDPARTY"
 combine_as_imports = true
 order_by_type = true
 profile = "black"
+known_first_party = "fediverser"
 
 [tool.poetry]
 name = "fediverser"
@@ -35,8 +36,9 @@ requests = "^2"
 langdetect = "^1.0"
 django = "^4.2"
 django-environ = "^0.10"
-celery = "^5.3"
-uvicorn = "^0.23"
+django-allauth = "^0.57"
+celery = "^5"
+uvicorn = {extras = ["standard"], version = "^0.23"}
 django-celery-beat = "^2.5"
 psycopg2-binary = "^2.9"
 redis = "^5"

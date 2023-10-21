@@ -1,0 +1,214 @@
+x-developer: &fediverser-development
+  user: "${UID:-1000}:${GID:-1000}"
+
+
+x-fediverser-dev: &fediverser-dev-service
+  <<: *fediverser-development
+  stdin_open: true
+  tty: true
+  build:
+    context: .
+  restart: unless-stopped
+
+  depends_on: &fediverser-service-dependencies
+    - cache
+    - broker
+    - db
+
+  environment: &fediverser_web_envvars
+    DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
+    FEDIVERSER_STATIC_ROOT: /var/fediverser/static
+    FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
+    FEDIVERSER_BROKER_URL: redis://broker:6379/0
+    FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
+    FEDIVERSER_CACHE_LOCATION: redis://cache:6379/0
+    FEDIVERSER_CORS_HEADERS_ENABLED: 1
+    FEDIVERSER_DATABASE_HOST: db
+    FEDIVERSER_DATABASE_PORT: 5432
+    FEDIVERSER_DATABASE_NAME: fediverser
+    FEDIVERSER_DATABASE_USER: fediverser
+    FEDIVERSER_DATABASE_PASSWORD: fediverser
+    LEMMY_DATABASE_HOST: lemmy-db
+    LEMMY_DATABASE_PORT: 5432
+    LEMMY_DATABASE_NAME: lemmy
+    LEMMY_DATABASE_USER: lemmy
+    LEMMY_DATABASE_PASSWORD: lemmy
+    FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@fediverser.example.com
+    FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+    FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
+    FEDIVERSER_DEBUG: "true"
+
+
+  env_file:
+    - .env
+
+  volumes:
+    - "${FEDIVERSER_APP_MOUNT_PATH:-./}:/app"
+    - "${FEDIVERSER_STATIC_MOUNT_PATH:-./docker/volumes/fediverser/media/static}:/var/fediverser/static"
+    - "${FEDIVERSER_MEDIA_MOUNT_PATH:-./docker/volumes/fediverser/media/media}:/var/fediverser/media"
+
+
+x-webapp: &fediverser-webservice
+  command: poetry run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir=/app/fediverser --reload-include *.html
+
+services:
+  db:
+    <<: *fediverser-development
+    image: "postgres:${FEDIVERSER_POSTGRES_SERVER_VERSION:-latest}"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fediverser
+      POSTGRES_PASSWORD: fediverser
+      POSTGRES_DB: fediverser
+    volumes:
+      - "${FEDIVERSER_DATABASE_MOUNT_PATH:-./docker/volumes/fediverser/database}:/var/lib/postgresql/data"
+
+
+  broker:
+    <<: *fediverser-development
+    image: redis:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - "${FEDIVERSER_BROKER_MOUNT_PATH:-./docker/volumes/fediverser/broker}:/data"
+
+  cache:
+    <<: *fediverser-development
+    image: redis:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - "${FEDIVERSER_CACHE_MOUNT_PATH:-./docker/volumes/fediverser/cache}:/data"
+
+  admin:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+    ports:
+      - 8001:80
+
+  portal:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+    ports:
+      - 8000:80
+
+  celery:
+    <<: *fediverser-dev-service
+
+  init_migrate_db:
+    <<: *fediverser-dev-service
+    restart: on-failure
+
+  init_collect_static:
+    <<: *fediverser-dev-service
+    restart: on-failure
+
+  lemmy:
+    <<: *fediverser-development
+    image: dessalines/lemmy:0.18.5
+    environment:
+      - RUST_LOG="warn,lemmy_server=info,lemmy_api=info,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info,lemmy_websocket=info"
+    volumes:
+      - "${FEDIVERSER_LEMMY_BACKEND_CONFIG_MOUNT_PATH:-./docker/volumes/lemmy}:/config/"
+    depends_on:
+      - lemmy-db
+      - lemmy-pictrs
+    ports:
+      - "8536:8536"
+
+  lemmy-ui:
+    <<: *fediverser-development
+    image: dessalines/lemmy-ui:0.18.5
+    restart: always
+    environment:
+      - LEMMY_UI_LEMMY_INTERNAL_HOST=lemmy:8536
+    volumes:
+      - "${FEDIVERSER_LEMMY_UI_MOUNT_PATH:-../docker/volumes/lemmy-ui/extra_themes}:/app/extra_themes"
+    depends_on:
+      - lemmy
+    ports:
+      - "1234:1234"
+
+  lemmy-db:
+    <<: *fediverser-development
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=lemmy
+      - POSTGRES_PASSWORD=lemmy
+      - POSTGRES_DB=lemmy
+    volumes:
+      - "${FEDIVERSER_LEMMY_DATABASE_MOUNT_PATH:-./docker/volumes/lemmy-db}:/var/lib/postgresql/data"
+    restart: always
+
+  lemmy-pictrs:
+    image: asonix/pictrs:0.4.5
+    user: 991:991
+    environment:
+      PICTRS__API_KEY: pictrs_pass
+      RUST_BACKTRACE: full
+      PICTRS__MEDIA__FORMAT: webp
+      PICTRS__MEDIA__ENABLE_FULL_VIDEO: "true"
+      PICTRS__MEDIA__VIDEO_CODEC: vp9
+      PICTRS__MEDIA__GIF__MAX_WIDTH: 1920
+      PICTRS__MEDIA__GIF__MAX_HEIGHT: 1080
+      PICTRS__MEDIA__GIF__MAX_AREA: 2073600
+      PICTRS__MEDIA__GIF__MAX_FRAME_COUNT: 1800
+      PICTRS__STORE__TYPE: object_storage
+      PICTRS__STORE__ENDPOINT: "http://lemmy-minio:9000"
+      PICTRS__STORE__BUCKET_NAME: "lemmy-media"
+      PICTRS__STORE__REGION: "us-east-1"
+      PICTRS__STORE__USE_PATH_STYLE: "true"
+      PICTRS__STORE__ACCESS_KEY: minio_user
+      PICTRS__STORE__SECRET_KEY: minio_pass
+
+    restart: always
+
+  lemmy-proxy:
+    image: nginx:1-alpine
+    restart: on-failure
+    ports:
+      - "8888:80"
+    volumes:
+      - "${FEDIVERSER_LEMMY_NGINX_CONFIG_MOUNT_PATH:-./docker/volumes/lemmy/nginx}:/etc/nginx/:ro"
+
+    depends_on:
+      - lemmy
+      - lemmy-ui
+      - lemmy-db
+      - lemmy-pictrs
+
+  lemmy-minio:
+    <<: *fediverser-development
+    image: minio/minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_pass
+    ports:
+      - "9000:9000"
+    volumes:
+      - "${FEDIVERSER_LEMMY_MEDIA_MOUNT_PATH:-./docker/volumes/lemmy-media}:/data"
+
+  init_minio_buckets:
+    image: minio/mc
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_pass
+
+    depends_on:
+      - lemmy-minio
+
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add fediverser http://lemmy-minio:9000 minio_user minio_pass;
+      /usr/bin/mc mb fediverser/lemmy-media;
+      /usr/bin/mc anonymous set download fediverser/lemmy-media;
+      /usr/bin/mc anonymous set public fediverser/lemmy-media;
+      exit 0;
+      "

@@ -1,5 +1,5 @@
 variables:
-  DJANGO_SETTINGS_MODULE: "fediverser.admin.settings"
+  DJANGO_SETTINGS_MODULE: "fediverser.services.base.settings"
   FEDIVERSER_BROKER_URL: "redis://redis:6379/0"
   FEDIVERSER_CACHE_BACKEND: "django_redis.cache.RedisCache"
   FEDIVERSER_CACHE_LOCATION: "redis://redis:6379/1"

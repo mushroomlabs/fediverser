@@ -41,7 +41,7 @@ def task_mutex(task_key, ttl=30 * 60):
 @shared_task
 def clone_redditor(reddit_username):
     try:
-        reddit_account = RedditAccount.objects.get(username=reddit_username)
+        reddit_account, _ = RedditAccount.objects.get(username=reddit_username)
         reddit_account.register_mirror()
     except RedditAccount.DoesNotExist:
         logger.warning("Could not find reddit account")

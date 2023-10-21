@@ -22,7 +22,7 @@ class LocalUserAdmin(admin.ModelAdmin):
 @admin.register(models.Person)
 class PersonAdmin(admin.ModelAdmin):
     list_display = ("name", "actor_id", "local", "instance")
-    list_filter = ("banned", "local", "deleted")
+    list_filter = ("banned", "local", "deleted", "bot_account")
     search_fields = ("name", "instance__domain")
 
 
