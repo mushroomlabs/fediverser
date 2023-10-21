@@ -41,7 +41,7 @@ def task_mutex(task_key, ttl=30 * 60):
 @shared_task
 def clone_redditor(reddit_username):
     try:
-        reddit_account, _ = RedditAccount.objects.get(username=reddit_username)
+        reddit_account = RedditAccount.objects.get(username=reddit_username)
         reddit_account.register_mirror()
     except RedditAccount.DoesNotExist:
         logger.warning("Could not find reddit account")
@@ -226,12 +226,9 @@ def pull_from_reddit(self):
             new_comments = [c for c in comments if c.id not in already_processed]
 
             for comment in new_comments:
-                try:
-                    subreddit = RedditCommunity.objects.get(
-                        name__iexact=comment.subreddit.display_name
-                    )
-                except Exception:
-                    breakpoint()
+                subreddit = RedditCommunity.objects.get(
+                    name__iexact=comment.subreddit.display_name
+                )
                 reddit_submission = RedditSubmission.objects.filter(
                     id=comment.submission.id
                 ).first()
