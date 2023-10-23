@@ -13,9 +13,17 @@ class ReadOnlyMixin:
         return False
 
 
+class LemmyCommunityInline(admin.TabularInline):
+    model = models.LemmyCommunity
+    fields = ("name",)
+    extra = 1
+
+
 @admin.register(models.LemmyInstance)
 class LemmyInstanceAdmin(admin.ModelAdmin):
     search_fields = ("domain",)
+
+    inlines = (LemmyCommunityInline,)
 
 
 @admin.register(models.LemmyCommunity)
