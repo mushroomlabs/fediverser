@@ -154,6 +154,7 @@ class LemmyCommunity(models.Model):
 
 class RedditCommunity(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    last_synced_at = models.DateTimeField(null=True)
 
     @property
     def comments(self):
@@ -171,9 +172,6 @@ class RedditCommunity(models.Model):
     def praw_object(self):
         reddit = make_reddit_client()
         return reddit.subreddit(self.name)
-
-    def new(self):
-        return self.praw_object.new()
 
     def __str__(self):
         return f"/r/{self.name}"
@@ -485,7 +483,15 @@ class RedditSubmission(AbstractRedditItem):
                     over_18=post.over_18,
                 ),
             )
-            post.comments.replace_more(limit=None)
+
+            # Remove all "more comments" from the tree of comments. Reasons:
+            # - Avoid extra requests on posts with hellthreads.
+            # - We don't really care about hellthreads
+            # - Most posts with lots of comments are usually "daily discussion", not to repost.
+            # - If we are pulling in (near) real-time, there will be few comments anyway
+            # - When we get a "new" comment deep in the tree, it builds the whole ancestry anyway.
+
+            post.comments.replace_more(limit=0)
             for comment in post.comments:
                 make_comment_thread(submission=submission, comment=comment, parent=None)
             return submission

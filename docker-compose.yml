@@ -6,19 +6,21 @@ x-fediverser-service: &fediverser-service
 
   environment: &fediverser-service-environment
     DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
+    FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
 
 services:
   admin:
     <<: *fediverser-service
-    environment:
-      <<: *fediverser-service-environment
-      FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
 
   portal:
     <<: *fediverser-service
     environment:
       <<: *fediverser-service-environment
       FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
+
+  sync_reddit:
+    <<: *fediverser-service
+    command: poetry run django-admin pull_from_reddit
 
   celery:
     <<: *fediverser-service

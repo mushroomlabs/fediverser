@@ -95,6 +95,9 @@ def fetch_new_posts(subreddit_name):
         for post in posts:
             RedditSubmission.make(subreddit=subreddit, post=post)
 
+        subreddit.last_synced_at = timezone.now()
+        subreddit.save()
+
     except RedditCommunity.DoesNotExist:
         logger.warning("Subreddit not found", extra={"name": subreddit_name})
 
@@ -190,53 +193,3 @@ def push_updates_to_lemmy(self):
             push_new_submissions_to_lemmy()
         else:
             logger.warning("Could not get lock. Skipping this run")
-
-
-@shared_task(bind=True)
-def pull_from_reddit(self):
-    client = make_reddit_client()
-
-    subreddit_names = RedditCommunity.objects.values_list("name", flat=True)
-
-    def make_ancestor(comment, submission):
-        has_parent = comment.parent_id.startswith("t1_")
-        if not has_parent:
-            return None
-
-        parent_comment_id = comment.parent_id.split("_", 1)[-1]
-
-        reddit_parent_comment = RedditComment.objects.filter(id=parent_comment_id).first()
-        if reddit_parent_comment is not None:
-            return reddit_parent_comment
-
-        parent_comment = client.comment(parent_comment_id)
-        grandparent = make_ancestor(parent_comment, submission)
-        return RedditComment.make(submission, comment=parent_comment, parent=grandparent)
-
-    with task_mutex(self.name) as lock_acquired:
-        if lock_acquired:
-            all_subreddits = "+".join(subreddit_names)
-            comments = [c for c in client.subreddit(all_subreddits).comments()]
-
-            comment_ids = set([c.id for c in comments])
-
-            already_processed = RedditComment.objects.filter(id__in=comment_ids).values_list(
-                "id", flat=True
-            )
-            new_comments = [c for c in comments if c.id not in already_processed]
-
-            for comment in new_comments:
-                subreddit = RedditCommunity.objects.get(
-                    name__iexact=comment.subreddit.display_name
-                )
-                reddit_submission = RedditSubmission.objects.filter(
-                    id=comment.submission.id
-                ).first()
-                if reddit_submission is None:
-                    post = client.submission(comment.submission.id)
-                    RedditSubmission.make(subreddit=subreddit, post=post)
-                    continue
-                parent = make_ancestor(comment, reddit_submission)
-                RedditComment.make(submission=reddit_submission, comment=comment, parent=parent)
-        else:
-            logger.warning("Could not get lock, skipping this run")

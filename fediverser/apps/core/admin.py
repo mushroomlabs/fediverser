@@ -28,7 +28,7 @@ class LemmyCommunityAdmin(admin.ModelAdmin):
 
 @admin.register(models.RedditCommunity)
 class RedditCommunityAdmin(admin.ModelAdmin):
-    list_display = ("name",)
+    list_display = ("name", "last_synced_at")
     search_fields = ("name",)
 
     actions = ("fetch_new_posts",)
