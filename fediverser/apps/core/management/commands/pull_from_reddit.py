@@ -5,6 +5,7 @@ import time
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from fediverser.apps.core.choices import AutomaticSubmissionPolicies
 from fediverser.apps.core.models import (
     RedditComment,
     RedditCommunity,
@@ -38,12 +39,16 @@ def refresh_subreddits(client):
     current_time = timezone.now()
     cutoff = current_time - QUERYING_INTERVAL
 
+    mapped_subreddits = RedditCommunity.objects.filter(reddittolemmycommunity__isnull=False)
+    automated_subreddits = mapped_subreddits.exclude(
+        reddittolemmycommunity__automatic_submission_policy=AutomaticSubmissionPolicies.NONE
+    )
+
+    subreddit_map = {r.name.lower(): r for r in automated_subreddits}
+
     # If a subreddit has been created and never synced, we set it for sync now.
-    RedditCommunity.objects.filter(last_synced_at=None).update(last_synced_at=cutoff)
-
-    all_subreddits = {r.name.lower(): r for r in RedditCommunity.objects.all()}
-
-    subreddits = RedditCommunity.objects.filter(last_synced_at__lt=cutoff)
+    automated_subreddits.filter(last_synced_at=None).update(last_synced_at=cutoff)
+    subreddits = automated_subreddits.filter(last_synced_at__lt=cutoff)
 
     if not subreddits.exists():
         logger.info("No subreddit pending refresh")
@@ -62,7 +67,7 @@ def refresh_subreddits(client):
     new_comments = [c for c in comments if c.id not in already_processed]
 
     for comment in new_comments:
-        subreddit = all_subreddits[comment.subreddit.display_name.lower()]
+        subreddit = subreddit_map[comment.subreddit.display_name.lower()]
         reddit_submission = RedditSubmission.objects.filter(id=comment.submission.id).first()
         if reddit_submission is None:
             post = client.submission(comment.submission.id)

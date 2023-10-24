@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from django.db.models import Count
 
 from . import models, tasks
-from .exceptions import LemmyClientRateLimited, RejectedComment
+from .exceptions import LemmyClientRateLimited, RejectedComment, RejectedPost
 
 
 class ReadOnlyMixin:
@@ -159,6 +159,10 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
             ):
                 try:
                     reddit_submission.post_to_lemmy(community)
+                except RejectedPost as exc:
+                    reddit_submission.status = models.RedditSubmission.STATUS.rejected
+                    reddit_submission.save()
+                    messages.error(request, f"Post {reddit_submission.id} rejected: {exc}")
                 except Exception as exc:
                     messages.error(
                         request,

@@ -26,7 +26,7 @@ from pythorhead.types import LanguageType
 from fediverser.apps.lemmy import models as lemmy_models
 
 from .choices import SOURCE_CONTENT_STATUSES, AutomaticCommentPolicies, AutomaticSubmissionPolicies
-from .exceptions import LemmyClientRateLimited, RejectedComment
+from .exceptions import LemmyClientRateLimited, RejectedComment, RejectedPost
 
 logger = logging.getLogger(__name__)
 
@@ -388,11 +388,25 @@ class RedditSubmission(AbstractRedditItem):
         reddit = make_reddit_client()
         return reddit.submission(id=self.id)
 
+    def validate(self):
+        try:
+            assert len(self.title) > 3, "Post title is too short"
+            assert len(self.title) < 200, "Post title is too long"
+            assert not self.removed, "Post has been removed on reddit"
+            assert self.selftext != "[removed]", "Post content was removed on reddit"
+        except AssertionError as exc:
+            raise RejectedPost(str(exc))
+
     def post_to_lemmy(self, lemmy_community):
+        MAX_TITLE_LENGTH = 200
+
         mirrored_post = LemmyMirroredPost.objects.filter(
             reddit_submission=self, lemmy_community=lemmy_community
         ).first()
+
         if mirrored_post is None:
+            self.validate()
+
             logger.info(f"Syncing reddit post {self.id} to {lemmy_community.name}")
             lemmy_client = self.author.make_lemmy_client()
             community_id = lemmy_client.discover_community(lemmy_community.fqdn)
@@ -402,14 +416,16 @@ class RedditSubmission(AbstractRedditItem):
                 else LanguageType.UNDETERMINED
             )
 
+            post_title = self.title[:MAX_TITLE_LENGTH]
+
             params = dict(
                 community_id=community_id,
-                name=self.title,
+                name=post_title,
                 nsfw=self.over_18,
                 language_id=post_language.value,
             )
 
-            if not self.is_self_post:
+            if self.is_link_post:
                 params["url"] = self.url
 
             if self.is_image_hosted_on_reddit:
@@ -554,7 +570,7 @@ class RedditComment(AbstractRedditItem):
         ).first()
 
         if mirrored_comment is None:
-            logger.info(f"Posting reddit comment {self.id} to lemmy mirrors")
+            logger.debug(f"Posting reddit comment {self.id} to lemmy mirrors")
             lemmy_client = self.author.make_lemmy_client()
             post_language = self.language
             if self.language not in mirrored_post.lemmy_community.languages:
@@ -590,6 +606,9 @@ class RedditComment(AbstractRedditItem):
                         lemmy_comment_id=new_comment_id,
                     )
                     self.status = self.STATUS.mirrored
+                    logger.debug(
+                        f"Posted comment {new_comment_id} ({mirrored_post.lemmy_community})"
+                    )
                 self.save()
 
         if include_children:
