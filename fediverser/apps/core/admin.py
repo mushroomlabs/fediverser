@@ -59,6 +59,7 @@ class RedditAccountAdmin(admin.ModelAdmin):
     list_filter = ("marked_as_spammer", "marked_as_bot")
     search_fields = ("username",)
     actions = ("create_lemmy_mirror", "mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
+    autocomplete_fields = ("subreddits",)
     readonly_fields = ("controller", "username", "password")
 
     @admin.action(description="Flag as spammer")

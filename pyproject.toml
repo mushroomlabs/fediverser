@@ -53,6 +53,8 @@ pycryptodome = "^3"
 pytest = "^7.4"
 pytest-env = "^1.0"
 pytest-django = "^4.5"
+django-compressor = "^4.4"
+pysass = "^0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.14.0"

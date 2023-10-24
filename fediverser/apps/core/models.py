@@ -44,6 +44,15 @@ def make_reddit_client(**kw):
     )
 
 
+def make_reddit_user_client(social_application, refresh_token):
+    return Reddit(
+        client_id=social_application.client_id,
+        client_secret=social_application.secret,
+        user_agent=settings.REDDIT_USER_AGENT,
+        refresh_token=refresh_token,
+    )
+
+
 def make_password():
     return secrets.token_urlsafe(30)
 
@@ -82,6 +91,10 @@ class LemmyCommunity(models.Model):
     @property
     def fqdn(self):
         return f"{self.name}@{self.instance.domain}"
+
+    @property
+    def url(self):
+        return f"https://{self.instance.domain}/c/{self.name}"
 
     @property
     def languages(self):
@@ -190,6 +203,7 @@ class RedditAccount(models.Model):
     rejected_invite = models.BooleanField(default=False)
     marked_as_spammer = models.BooleanField(default=False)
     marked_as_bot = models.BooleanField(default=False)
+    subreddits = models.ManyToManyField(RedditCommunity, blank=True)
 
     @property
     def is_initial_password_in_use(self):
@@ -217,7 +231,17 @@ class RedditAccount(models.Model):
             ]
         )
 
-    def register_mirror(self):
+    def unbot_mirror(self):
+        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        if lemmy_mirror is None:
+            logger.warning("Lemmy Mirror instance is not properly configured")
+            return
+
+        lemmy_models.Person.objects.filter(name=self.username, instance=lemmy_mirror).update(
+            bot_account=False
+        )
+
+    def register_mirror(self, as_bot=True):
         lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
         if lemmy_mirror is None:
             logger.warning("Lemmy Mirror instance is not properly configured")
@@ -237,7 +261,7 @@ class RedditAccount(models.Model):
                 "published": timezone.now(),
                 "last_refreshed_at": timezone.now(),
                 "local": True,
-                "bot_account": self.controller is None,
+                "bot_account": as_bot,
                 "deleted": False,
                 "banned": False,
                 "admin": False,
@@ -250,6 +274,10 @@ class RedditAccount(models.Model):
                 "accepted_application": True,
             },
         )
+
+    @property
+    def mirror_lemmy_user(self):
+        return lemmy_models.LocalUser.objects.get(person__name=self.username)
 
     def make_lemmy_client(self):
         global LEMMY_CLIENTS

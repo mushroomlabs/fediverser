@@ -19,10 +19,26 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def clone_redditor(reddit_username):
+def clone_redditor(reddit_username, as_bot=True):
     try:
         reddit_account = RedditAccount.objects.get(username=reddit_username)
-        reddit_account.register_mirror()
+        reddit_account.register_mirror(as_bot=as_bot)
+    except RedditAccount.DoesNotExist:
+        logger.warning("Could not find reddit account")
+        return
+
+
+@shared_task
+def subscribe_to_lemmy_community(reddit_username, lemmy_community_id):
+    try:
+        reddit_account = RedditAccount.objects.get(username=reddit_username)
+        lemmy_community = LemmyCommunity.objects.get(id=lemmy_community_id)
+        lemmy_client = reddit_account.make_lemmy_client()
+        community_id = lemmy_client.discover_community(lemmy_community.fqdn)
+        lemmy_client.community.follow(community_id)
+        if not reddit_account.is_initial_password_in_use:
+            logger.warning("Account is taken over by owner, can not do anything on their behalf")
+            return
     except RedditAccount.DoesNotExist:
         logger.warning("Could not find reddit account")
         return

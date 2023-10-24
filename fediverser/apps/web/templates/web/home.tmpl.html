@@ -5,6 +5,7 @@
 {% block main_contents %}
 
 {% if user.redditaccount %}
+<section class="lemmy-account-details">
 <h3>Control Panel</h3>
 
 <p>
@@ -21,19 +22,61 @@
   Your initial
   password is <em>{{ user.redditaccount.password }}</em>. Please change
   the password as soon as possible.</p>
-
+</section>
 {% endif %}
+<section class="lemmy-communities">
+<h3>Subreddit to Lemmy Communities</h3>
+
+<p>
+  One of the current challenges for people that want to join the
+  fediverse is the lack of central repository of information about the
+  communities and instances that are recommended for those that are used to reddit.
+</p>
+
+{% if user.redditaccount.subreddits.count %}
+<p>
+  The following table shows you the subreddits you are subscribed and
+  the corresponding lemmy communities that your Lemmy account could be
+  following instead
+</p>
+
+  <table>
+    <thead>
+      <th>Subreddit</th>
+      <th>Recommended Lemmy Communities</th>
+    </thead>
+    <tbody>
+      {% for subreddit in user.redditaccount.subreddits.all %}
+      <tr>
+        <td>{{ subreddit }}</td>
+        <td>
+          <ul>
+            {% for mapped_item in subreddit.reddittolemmycommunity_set.all %}
+            <li>
+              <a href="{{ mapped_item.lemmy_community | lemmy_mirrored_community_url }}">
+                {{ mapped_item.lemmy_community.fqdn }}
+              </a>
+            </li>
+            {% empty %}
+            <li>No recommendation at the moment</li>
+            {% endfor %}
+
+          </ul>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+</table>
+
+  {% else %}
+  <p>
+    It seems that you are not subscribed to any subreddit, so the best we can do is offer you a link curated by the folks from <a href="https://redditmigration.com/">Reddit Migration</a>
+  </p>
+  {% endif %}
 
 <h4>What else can you do here?</h4>
 
 <ul>
-  <li>
-    <s>
-      Find and subscribe all the Lemmy communities that
-      correspond to your favorite subreddits
-    </s>
-    (Coming soon)
-  </li>
   <li>
     <s>Import your post and comment history. Requires a reddit API
       key.
@@ -50,7 +93,7 @@
   <li>
     <s>Invite friends</s> (Coming soon)</li>
 </ul>
-
+</section>
 {% else %}
 
 <h2>Ready to join the Fediverse?</h2>
@@ -60,10 +103,13 @@ up.
 
 <ul>
   <li>
-    <a href="{% url 'web:reddit-connection-setup' %}">Connect
-      your reddit account
-    </a> to access Lemmy at
-    <a href="https://{%lemmy_mirror_instance%}">{% lemmy_mirror_instance %}</a>.
+    <p>
+      <a href="{% url 'web:reddit-connection-setup' %}">Connect
+        your reddit account
+      </a> to access Lemmy at
+      <a href="https://{%lemmy_mirror_instance%}">{% lemmy_mirror_instance %}</a>.
+    </p>
+    <p>We will check the subreddits you are currently subscribed and guide you to the recommended correspondent community</p>
   </li>
 </ul>
 {% endif %}

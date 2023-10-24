@@ -43,7 +43,7 @@ x-fediverser-dev: &fediverser-dev-service
     - .env
 
   volumes:
-    - "${FEDIVERSER_APP_MOUNT_PATH:-./}:/app"
+    - ./:/app
     - "${FEDIVERSER_STATIC_MOUNT_PATH:-./docker/volumes/fediverser/media/static}:/var/fediverser/static"
     - "${FEDIVERSER_MEDIA_MOUNT_PATH:-./docker/volumes/fediverser/media/media}:/var/fediverser/media"
 

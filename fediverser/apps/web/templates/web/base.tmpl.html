@@ -1,4 +1,4 @@
-{% load i18n static %}
+{% load i18n static compress %}
 <!DOCTYPE html>
 <html>
   <head>
@@ -7,7 +7,10 @@
     <meta name="viewport" content="width=device-width">
     {% endblock %}
     {% block header_stylesheets %}
+    {% compress css %}
     <link rel="stylesheet" type="text/css" href="{% static 'web/stylesheets/simple.min.css' %}">
+    <link rel="stylesheet" type="text/x-sass" href="{% static 'web/stylesheets/site.scss' %}">
+    {% endcompress %}
     {% endblock %}
     {% block header_extra_js %}{% endblock %}
     {% block header_extra_css %}{% endblock %}

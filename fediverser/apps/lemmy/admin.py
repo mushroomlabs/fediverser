@@ -1,4 +1,7 @@
+import datetime
+
 from django.contrib import admin
+from django.utils.timezone import make_aware
 
 from . import models
 
@@ -24,6 +27,12 @@ class PersonAdmin(admin.ModelAdmin):
     list_display = ("name", "actor_id", "local", "instance")
     list_filter = ("banned", "local", "deleted", "bot_account")
     search_fields = ("name", "instance__domain")
+
+    def get_queryset(self, *args, **kw):
+        end_date = make_aware(datetime.datetime(year=9999, month=12, day=31))
+        qs = super().get_queryset(*args, **kw)
+        qs.filter(ban_expires__gt=end_date).update(ban_expires=end_date)
+        return qs
 
 
 @admin.register(models.Instance)

@@ -1,4 +1,5 @@
 import os
+from shutil import which
 
 import environ
 
@@ -35,6 +36,7 @@ THIRD_PARTY_APPS = (
     "django_celery_beat",
     "django_celery_results",
     "django_extensions",
+    "compressor",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -168,7 +170,7 @@ ACCOUNT_PRESERVE_USERNAME_CASING = False
 
 SOCIALACCOUNT_PROVIDERS = {
     "reddit": {
-        "AUTH_PARAMS": {"duration": "permanent"},
+        "AUTH_PARAMS": {"duration": "permanent", "access_type": "offline"},
         "SCOPE": [
             "identity",
             "mysubreddits",
@@ -177,7 +179,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "submit",
         ],
         "USER_AGENT": env.str("FEDIVERSER_USER_AGENT", default=REDDIT_USER_AGENT),
-    }
+    },
 }
 
 # Internationalization
@@ -196,10 +198,16 @@ USE_TZ = True
 STATICFILES_FINDERS = (
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "compressor.finders.CompressorFinder",
 )
 
-STATIC_URL = env.str("FEDIVERSER_STATIC_URL", default="/static/")
-STATIC_ROOT = env.str(
+
+COMPRESS_ENABLED = True
+COMPRESS_PRECOMPILERS = (("text/x-sass", "{} {{infile}} {{outfile}}".format(which("pysassc"))),)
+COMPRESS_CSS_FILTERS = ["compressor.filters.css_default.CssAbsoluteFilter"]
+
+COMPRESS_URL = STATIC_URL = env.str("FEDIVERSER_STATIC_URL", default="/static/")
+COMPRESS_ROOT = STATIC_ROOT = env.str(
     "FEDIVERSER_STATIC_ROOT", default=os.path.abspath(os.path.join(BASE_DIR, "static"))
 )
 MEDIA_ROOT = os.getenv("FEDIVERSER_MEDIA_ROOT", os.path.abspath(os.path.join(BASE_DIR, "media")))
