@@ -350,11 +350,11 @@ class RedditSubmission(AbstractRedditItem):
 
     @property
     def is_link_post(self):
-        return all(
+        return not any(
             [
-                not self.is_cross_post,
-                not self.is_media_hosted_on_reddit,
-                not self.url.startswith("https://reddit.com"),
+                self.is_cross_post,
+                self.is_media_hosted_on_reddit,
+                self.url.startswith("https://reddit.com"),
             ]
         )
 
@@ -425,9 +425,25 @@ class RedditSubmission(AbstractRedditItem):
         except AssertionError as exc:
             raise RejectedPost(str(exc))
 
-    def post_to_lemmy(self, lemmy_community):
+    def to_lemmy_post_payload(self):
         MAX_TITLE_LENGTH = 200
 
+        post_title = self.title[:MAX_TITLE_LENGTH]
+
+        payload = dict(
+            name=post_title,
+            nsfw=self.over_18,
+        )
+
+        if self.is_link_post:
+            payload["url"] = self.url
+
+        if self.has_self_text:
+            payload["body"] = self.selftext
+
+        return payload
+
+    def post_to_lemmy(self, lemmy_community):
         mirrored_post = LemmyMirroredPost.objects.filter(
             reddit_submission=self, lemmy_community=lemmy_community
         ).first()
@@ -437,24 +453,21 @@ class RedditSubmission(AbstractRedditItem):
 
             logger.info(f"Syncing reddit post {self.id} to {lemmy_community.name}")
             lemmy_client = self.author.make_lemmy_client()
-            community_id = lemmy_client.discover_community(lemmy_community.fqdn)
+
             post_language = (
                 self.language
                 if self.language in lemmy_community.languages
                 else LanguageType.UNDETERMINED
             )
 
-            post_title = self.title[:MAX_TITLE_LENGTH]
+            payload = self.to_lemmy_post_payload()
 
-            params = dict(
-                community_id=community_id,
-                name=post_title,
-                nsfw=self.over_18,
-                language_id=post_language.value,
+            payload.update(
+                {
+                    "community_id": lemmy_client.discover_community(lemmy_community.fqdn),
+                    "language_id": post_language.value,
+                }
             )
-
-            if self.is_link_post:
-                params["url"] = self.url
 
             if self.is_image_hosted_on_reddit:
                 _, suffix = self.url.rsplit(".", 1)
@@ -468,14 +481,11 @@ class RedditSubmission(AbstractRedditItem):
                     with open(file_path, "w+b") as f:
                         f.write(image_download.content)
                     upload_response = lemmy_client.image.upload(file_path)
-                params["url"] = upload_response[0]["image_url"]
-
-            if self.has_self_text:
-                params["body"] = self.selftext
+                payload["url"] = upload_response[0]["image_url"]
 
             with transaction.atomic():
                 try:
-                    lemmy_post = lemmy_client.post.create(**params)
+                    lemmy_post = lemmy_client.post.create(**payload)
                     mirrored_post = LemmyMirroredPost.objects.create(
                         reddit_submission=self,
                         lemmy_post_id=lemmy_post["post_view"]["post"]["id"],
