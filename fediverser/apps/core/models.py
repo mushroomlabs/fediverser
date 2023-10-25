@@ -355,12 +355,14 @@ class RedditSubmission(AbstractRedditItem):
                 self.is_cross_post,
                 self.is_media_hosted_on_reddit,
                 self.url.startswith("https://reddit.com"),
+                self.url.startswith("https://www.reddit.com"),
             ]
         )
 
     @property
     def is_self_post(self):
-        return self.url.startswith("https://reddit.com") or self.has_self_text
+        reddit_urls = ["https://reddit.com", "https://www.reddit.com"]
+        return any([self.url.startswith(root) for root in reddit_urls])
 
     @property
     def is_cross_post(self):
