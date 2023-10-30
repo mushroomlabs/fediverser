@@ -1,0 +1,58 @@
+x-application-environment: &application-environment
+  environment:
+    DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
+    FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
+    FEDIVERSER_BROKER_URL: redis://broker:6379/0
+    FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
+    FEDIVERSER_CACHE_LOCATION: redis://cache:6379/0
+    FEDIVERSER_DATABASE_NAME: fediverser_ci
+    FEDIVERSER_DATABASE_USER: fediverser
+    FEDIVERSER_DATABASE_PASSWORD: fediverser_pass
+    FEDIVERSER_DATABASE_HOST: database
+    FEDIVERSER_DATABASE_PORT: 5432
+    FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@gitlab.example.com
+    FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
+    FEDIVERSER_STATIC_ROOT: /var/fediverser/static
+    FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
+    LEMMY_DATABASE_ENGINE: django.db.backends.sqlite3
+    LEMMY_DATABASE_NAME: ":memory:"
+
+steps:
+  lint:
+    image: python:3.11-slim
+    commands:
+      - pip install flake8
+      - flake8
+
+  test:
+    image: python:3.11-slim
+    <<: *application-environment
+    commands:
+      - apt update
+      - apt install build-essential cargo -y
+      - pip install poetry
+      - poetry install
+      - pytest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+services:
+  cache:
+    image: redis:7-alpine
+
+  broker:
+    image: redis:7-alpine
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fediverser_ci
+      POSTGRES_USER: fediverser
+      POSTGRES_PASSWORD: fediverser_pass
+
+when:
+  event:
+    - push
+    - pull_request
+    - tag
+    - manual
