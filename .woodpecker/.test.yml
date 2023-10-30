@@ -9,7 +9,6 @@ x-application-environment: &application-environment
     FEDIVERSER_DATABASE_USER: fediverser
     FEDIVERSER_DATABASE_PASSWORD: fediverser_pass
     FEDIVERSER_DATABASE_HOST: database
-    FEDIVERSER_DATABASE_PORT: 5432
     FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@gitlab.example.com
     FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
     FEDIVERSER_STATIC_ROOT: /var/fediverser/static
