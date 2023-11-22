@@ -43,8 +43,8 @@ def push_new_comments_to_lemmy():
         comments_pending = candidates.filter(with_mirrored_submissions).filter(no_pending_parent)
 
         for comment in comments_pending.distinct().iterator():
+            logger.info(f"Mirroring comment {comment.id}")
             for mirrored_post in comment.submission.lemmy_mirrored_posts.all():
-                logger.info(f"Mirroring comment {comment.id}")
                 try:
                     community_name = mirrored_post.lemmy_community.name
                     comment.make_mirror(mirrored_post=mirrored_post, include_children=False)
@@ -60,8 +60,6 @@ def push_new_comments_to_lemmy():
 
                 except Exception:
                     logger.exception(f"Failed to mirror comment {comment.id} to {community_name}")
-            else:
-                logger.info(f"Comment {comment.id} is pending but post has not been mirrored yet.")
 
 
 class Command(BaseCommand):
