@@ -36,9 +36,10 @@ class LemmyCommunityAdmin(admin.ModelAdmin):
 
 @admin.register(models.RedditCommunity)
 class RedditCommunityAdmin(admin.ModelAdmin):
+    change_form_template = "admin/redditcommunity_change_form.html"
+
     list_display = ("name", "last_synced_at")
     search_fields = ("name",)
-
     actions = ("fetch_new_posts",)
 
     @admin.action(description="Fetch new submissions")
