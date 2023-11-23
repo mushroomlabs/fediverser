@@ -16,4 +16,4 @@ class AutomaticCommentPolicies(TextChoices):
     FULL = ("Full", "Mirror all comment threads")
 
 
-SOURCE_CONTENT_STATUSES = Choices("retrieved", "rejected", "failed", "mirrored")
+SOURCE_CONTENT_STATUSES = Choices("retrieved", "accepted", "rejected", "failed", "mirrored")

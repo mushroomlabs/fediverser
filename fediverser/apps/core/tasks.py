@@ -5,11 +5,13 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from .exceptions import LemmyClientRateLimited, RejectedComment
 from .models import (
     LemmyCommunity,
     LemmyCommunityInvite,
     LemmyCommunityInviteTemplate,
     RedditAccount,
+    RedditComment,
     RedditCommunity,
     RedditSubmission,
     make_reddit_client,
@@ -96,3 +98,28 @@ def fetch_new_posts(subreddit_name):
 
     except RedditCommunity.DoesNotExist:
         logger.warning("Subreddit not found", extra={"name": subreddit_name})
+
+
+@shared_task
+def mirror_comment_to_lemmy(comment_id):
+    try:
+        comment = RedditComment.objects.get(id=comment_id, status=RedditComment.STATUS.accepted)
+    except RedditComment.DoesNotExist:
+        logger.warning(f"Comment {comment_id} not found or not accepted for scheduling")
+        return
+
+    for mirrored_post in comment.submission.lemmy_mirrored_posts.all():
+        community_name = mirrored_post.lemmy_community.name
+        try:
+            comment.make_mirror(mirrored_post=mirrored_post, include_children=False)
+
+        except RejectedComment as exc:
+            logger.warning(f"Comment is rejected: {exc}")
+            comment.status = RedditComment.STATUS.rejected
+            comment.save()
+
+        except LemmyClientRateLimited:
+            logger.warning("Too many requests. Need to cool down requests to Lemmy")
+
+        except Exception:
+            logger.exception(f"Failed to mirror comment {comment_id} to {community_name}")
