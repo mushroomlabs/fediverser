@@ -8,3 +8,7 @@ class RejectedPost(Exception):
 
 class LemmyClientRateLimited(Exception):
     pass
+
+
+class LemmyProxyUserNotConfigured(Exception):
+    pass

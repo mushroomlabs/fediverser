@@ -10,6 +10,7 @@ from .models import (
     LemmyCommunity,
     LemmyCommunityInvite,
     LemmyCommunityInviteTemplate,
+    LemmyMirroredPost,
     RedditAccount,
     RedditComment,
     RedditCommunity,
@@ -21,29 +22,40 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
+def post_mirror_disclosure(mirrored_post_id):
+    try:
+        mirrored_post = LemmyMirroredPost.objects.get(id=mirrored_post_id)
+        mirrored_post.submit_disclosure_comment()
+    except LemmyMirroredPost.DoesNotExist:
+        logger.warning("Could not find mirrored post")
+
+
+@shared_task
 def clone_redditor(reddit_username, as_bot=True):
     try:
         reddit_account = RedditAccount.objects.get(username=reddit_username)
         reddit_account.register_mirror(as_bot=as_bot)
     except RedditAccount.DoesNotExist:
         logger.warning("Could not find reddit account")
-        return
 
 
 @shared_task
 def subscribe_to_lemmy_community(reddit_username, lemmy_community_id):
     try:
         reddit_account = RedditAccount.objects.get(username=reddit_username)
+        assert (
+            reddit_account.is_initial_password_in_use
+        ), "Account is taken over by owner, can not do anything on their behalf"
+
         lemmy_community = LemmyCommunity.objects.get(id=lemmy_community_id)
         lemmy_client = reddit_account.make_lemmy_client()
         community_id = lemmy_client.discover_community(lemmy_community.fqdn)
         lemmy_client.community.follow(community_id)
-        if not reddit_account.is_initial_password_in_use:
-            logger.warning("Account is taken over by owner, can not do anything on their behalf")
-            return
     except RedditAccount.DoesNotExist:
         logger.warning("Could not find reddit account")
-        return
+
+    except AssertionError as exc:
+        logger.warning(str(exc))
 
 
 def send_lemmy_community_invite_to_redditor(redditor_name: str, subreddit_name: str):

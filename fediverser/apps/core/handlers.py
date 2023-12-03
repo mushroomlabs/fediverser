@@ -6,14 +6,21 @@ from django.contrib.auth import get_user_model
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
-from .models import RedditAccount, RedditCommunity, make_reddit_user_client
-from .tasks import clone_redditor, subscribe_to_lemmy_community
+from .models import LemmyMirroredPost, RedditAccount, RedditCommunity, make_reddit_user_client
+from .tasks import clone_redditor, post_mirror_disclosure, subscribe_to_lemmy_community
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
 REDDIT_PROVIDER = "reddit"
+
+
+@receiver(post_save, sender=LemmyMirroredPost)
+def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
+    if kw["created"] and not kw["raw"]:
+        mirrored_post = kw["instance"]
+        post_mirror_disclosure.delay(mirrored_post.id)
 
 
 @receiver(post_save, sender=RedditAccount)
