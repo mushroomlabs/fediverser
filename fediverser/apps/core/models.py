@@ -562,7 +562,10 @@ class RedditSubmission(AbstractRedditItem):
                     with open(file_path, "w+b") as f:
                         f.write(image_download.content)
                     upload_response = lemmy_client.image.upload(file_path)
-                payload["url"] = upload_response[0]["image_url"]
+                try:
+                    payload["url"] = upload_response[0]["image_url"]
+                except (TypeError, AttributeError, KeyError):
+                    raise RejectedPost("Image could not be uploaded")
 
             with transaction.atomic():
                 try:
