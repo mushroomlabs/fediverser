@@ -37,27 +37,36 @@ def push_new_submissions_to_lemmy():
     ).exclude(unmapped | from_spammer | from_bot | old_post | already_posted)
 
     for reddit_submission in submissions.distinct():
+        logger.info(f"Checking submission {reddit_submission.url}")
+
         if not reddit_submission.can_be_submitted_automatically:
+            reddit_submission.status = RedditSubmission.STATUS.rejected
+            reddit_submission.save()
             continue
 
-        lemmy_communities = LemmyCommunity.objects.filter(
-            reddittolemmycommunity__subreddit=reddit_submission.subreddit
-        )
+        lemmy_communities = [
+            community
+            for community in LemmyCommunity.objects.filter(
+                reddittolemmycommunity__subreddit=reddit_submission.subreddit
+            )
+            if community.can_accept_automatic_submission(reddit_submission)
+        ]
+
+        if len(lemmy_communities) == 0:
+            reddit_submission.status = RedditSubmission.STATUS.rejected
+            reddit_submission.save()
+            continue
 
         for lemmy_community in lemmy_communities:
-            if lemmy_community.can_accept_automatic_submission(reddit_submission):
-                try:
-                    reddit_submission.post_to_lemmy(lemmy_community)
-                    logger.info(f"Posted {reddit_submission.id} to {lemmy_community.name}")
-                except RejectedPost as exc:
-                    logger.warning(f"Post was rejected: {exc}")
-                    reddit_submission.status = RedditSubmission.STATUS.rejected
-                    reddit_submission.save()
-                except LemmyClientRateLimited:
-                    logger.warning("Too many requests. Will stop pushing submissions to Lemmy")
-                    return
-                except Exception:
-                    logger.exception(f"Failed to post {reddit_submission.id}")
+            try:
+                reddit_submission.post_to_lemmy(lemmy_community)
+                logger.info(f"Posted {reddit_submission.id} to {lemmy_community.name}")
+            except RejectedPost as exc:
+                logger.warning(f"Post was rejected: {exc}")
+                reddit_submission.status = RedditSubmission.STATUS.rejected
+                reddit_submission.save()
+            except Exception:
+                logger.exception(f"Failed to post {reddit_submission.id}")
 
 
 class Command(BaseCommand):
@@ -65,6 +74,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         while True:
+            time.sleep(1)
             try:
                 push_new_submissions_to_lemmy()
             except LemmyClientRateLimited:
