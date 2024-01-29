@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(PROJECT_DIR)
 SECRET_KEY = env.str("FEDIVERSER_SECRET_KEY")
 
 DEBUG = env.bool("FEDIVERSER_DEBUG", default=False)
-TEST_MODE = "FEDIVERSER_TEST" in os.environ
+TEST_MODE = env.bool("FEDIVERSER_TEST", default=False)
 
 ALLOWED_HOSTS = ["*"]
 
@@ -107,7 +107,7 @@ DATABASES = {
         "USER": env.str("FEDIVERSER_DATABASE_USER", default="fediverser"),
         "PASSWORD": env.str("FEDIVERSER_DATABASE_PASSWORD"),
         "HOST": env.str("FEDIVERSER_DATABASE_HOST", default="db"),
-        "PORT": env.str("FEDIVERSER_DATABASE_PORT", default=5432),
+        "PORT": env.int("FEDIVERSER_DATABASE_PORT", default=5432),
     },
     "lemmy": {
         "ENGINE": env.str(
@@ -117,7 +117,7 @@ DATABASES = {
         "USER": env.str("LEMMY_DATABASE_USER", default="lemmy"),
         "PASSWORD": env.str("LEMMY_DATABASE_PASSWORD", default=None),
         "HOST": env.str("LEMMY_DATABASE_HOST", default="lemmy-db"),
-        "PORT": env.str("LEMMY_DATABASE_PORT", default=5432),
+        "PORT": env.int("LEMMY_DATABASE_PORT", default=5432),
     },
 }
 DATABASE_ROUTERS = ("fediverser.services.base.database_router.InternalRouter",)

@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from django.test import TestCase
 
 from fediverser.apps.core import factories
@@ -7,7 +8,12 @@ from fediverser.apps.core.choices import AutomaticSubmissionPolicies
 from fediverser.apps.core.models import LemmyCommunity, LemmyInstance, RedditSubmission
 
 
-class LemmyInstanceTestCase(TestCase):
+@pytest.mark.django_db(transaction=True)
+class BaseTestCase(TestCase):
+    pass
+
+
+class LemmyInstanceTestCase(BaseTestCase):
     def setUp(self):
         self.instance = factories.LemmyInstanceFactory(domain="test.example.com")
 
@@ -15,7 +21,7 @@ class LemmyInstanceTestCase(TestCase):
         self.assertEqual(self.instance.domain, "test.example.com")
 
 
-class RedditToLemmyCommunityTestCase(TestCase):
+class RedditToLemmyCommunityTestCase(BaseTestCase):
     def test_can_make_automatic_submission_policies(self):
         poster = factories.RedditToLemmyCommunityFactory(
             automatic_submission_policy=AutomaticSubmissionPolicies.FULL
@@ -41,7 +47,7 @@ class RedditToLemmyCommunityTestCase(TestCase):
             self.assertTrue(poster.lemmy_community.can_accept_automatic_submission(submission))
 
 
-class RedditSubmissionTestCase(TestCase):
+class RedditSubmissionTestCase(BaseTestCase):
     def test_self_posts_are_not_linked_to_reddit(self):
         post = factories.RedditSubmissionFactory(
             url="https://www.reddit.com/r/testing/comments/17fuc65/this_is_a_test_post/",
@@ -75,3 +81,6 @@ class RedditSubmissionTestCase(TestCase):
         self.assertTrue("url" in lemmy_post_payload)
         self.assertTrue("body" in lemmy_post_payload)
         self.assertEqual(lemmy_post_payload["body"], "A cool URI is one which does not change.")
+
+
+__all__ = ["LemmyInstanceTestCase", "RedditSubmissionTestCase"]

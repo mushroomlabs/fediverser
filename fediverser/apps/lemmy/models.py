@@ -1,6 +1,4 @@
-from django.conf import settings
 from django.db import models
-from pythorhead import Lemmy
 
 
 class DieselSchemaMigrations(models.Model):
@@ -16,9 +14,7 @@ class AdminPurgeComment(models.Model):
     admin_person = models.ForeignKey("Person", models.DO_NOTHING)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -28,9 +24,7 @@ class AdminPurgeComment(models.Model):
 class AdminPurgeCommunity(models.Model):
     admin_person = models.ForeignKey("Person", models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -40,9 +34,7 @@ class AdminPurgeCommunity(models.Model):
 class AdminPurgePerson(models.Model):
     admin_person = models.ForeignKey("Person", models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -53,9 +45,7 @@ class AdminPurgePost(models.Model):
     admin_person = models.ForeignKey("Person", models.DO_NOTHING)
     community = models.ForeignKey("Community", models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -63,7 +53,7 @@ class AdminPurgePost(models.Model):
 
 
 class CaptchaAnswer(models.Model):
-    uuid = models.UUIDField(unique=True)
+    uuid = models.UUIDField(primary_key=True)
     answer = models.TextField()
     published = models.DateTimeField()
 
@@ -82,7 +72,7 @@ class Comment(models.Model):
     deleted = models.BooleanField()
     ap_id = models.CharField(unique=True, max_length=255)
     local = models.BooleanField()
-    path = models.TextField()  # This field type is a guess.
+    path = models.TextField()
     distinguished = models.BooleanField()
     language = models.ForeignKey("Language", models.DO_NOTHING)
 
@@ -92,13 +82,14 @@ class Comment(models.Model):
 
 
 class CommentAggregates(models.Model):
-    comment = models.OneToOneField(Comment, models.DO_NOTHING)
+    comment = models.OneToOneField(Comment, models.DO_NOTHING, primary_key=True)
     score = models.BigIntegerField()
     upvotes = models.BigIntegerField()
     downvotes = models.BigIntegerField()
     published = models.DateTimeField()
     child_count = models.IntegerField()
-    hot_rank = models.IntegerField()
+    hot_rank = models.FloatField()
+    controversy_rank = models.FloatField()
 
     class Meta:
         managed = False
@@ -106,7 +97,7 @@ class CommentAggregates(models.Model):
 
 
 class CommentLike(models.Model):
-    person = models.ForeignKey("Person", models.DO_NOTHING)
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
     comment = models.ForeignKey(Comment, models.DO_NOTHING)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     score = models.SmallIntegerField()
@@ -115,7 +106,7 @@ class CommentLike(models.Model):
     class Meta:
         managed = False
         db_table = "comment_like"
-        unique_together = (("comment", "person"),)
+        unique_together = (("person", "comment"),)
 
 
 class CommentReply(models.Model):
@@ -154,13 +145,13 @@ class CommentReport(models.Model):
 
 class CommentSaved(models.Model):
     comment = models.ForeignKey(Comment, models.DO_NOTHING)
-    person = models.ForeignKey("Person", models.DO_NOTHING)
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "comment_saved"
-        unique_together = (("comment", "person"),)
+        unique_together = (("person", "comment"),)
 
 
 class Community(models.Model):
@@ -179,14 +170,15 @@ class Community(models.Model):
     last_refreshed_at = models.DateTimeField()
     icon = models.TextField(blank=True, null=True)
     banner = models.TextField(blank=True, null=True)
-    followers_url = models.CharField(unique=True, max_length=255)
-    inbox_url = models.CharField(unique=True, max_length=255)
+    followers_url = models.CharField(unique=True, max_length=255, blank=True, null=True)
+    inbox_url = models.CharField(max_length=255)
     shared_inbox_url = models.CharField(max_length=255, blank=True, null=True)
     hidden = models.BooleanField()
     posting_restricted_to_mods = models.BooleanField()
     instance = models.ForeignKey("Instance", models.DO_NOTHING)
     moderators_url = models.CharField(unique=True, max_length=255, blank=True, null=True)
     featured_url = models.CharField(unique=True, max_length=255, blank=True, null=True)
+    visibility = models.TextField()
 
     class Meta:
         managed = False
@@ -194,7 +186,7 @@ class Community(models.Model):
 
 
 class CommunityAggregates(models.Model):
-    community = models.OneToOneField(Community, models.DO_NOTHING)
+    community = models.OneToOneField(Community, models.DO_NOTHING, primary_key=True)
     subscribers = models.BigIntegerField()
     posts = models.BigIntegerField()
     comments = models.BigIntegerField()
@@ -203,7 +195,8 @@ class CommunityAggregates(models.Model):
     users_active_week = models.BigIntegerField()
     users_active_month = models.BigIntegerField()
     users_active_half_year = models.BigIntegerField()
-    hot_rank = models.IntegerField()
+    hot_rank = models.FloatField()
+    subscribers_local = models.BigIntegerField()
 
     class Meta:
         managed = False
@@ -211,7 +204,7 @@ class CommunityAggregates(models.Model):
 
 
 class CommunityBlock(models.Model):
-    person = models.ForeignKey("Person", models.DO_NOTHING)
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
     community = models.ForeignKey(Community, models.DO_NOTHING)
     published = models.DateTimeField()
 
@@ -223,18 +216,18 @@ class CommunityBlock(models.Model):
 
 class CommunityFollower(models.Model):
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    person = models.ForeignKey("Person", models.DO_NOTHING)
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
     pending = models.BooleanField()
 
     class Meta:
         managed = False
         db_table = "community_follower"
-        unique_together = (("community", "person"),)
+        unique_together = (("person", "community"),)
 
 
 class CommunityLanguage(models.Model):
-    community = models.ForeignKey(Community, models.DO_NOTHING)
+    community = models.OneToOneField(Community, models.DO_NOTHING, primary_key=True)
     language = models.ForeignKey("Language", models.DO_NOTHING)
 
     class Meta:
@@ -245,25 +238,25 @@ class CommunityLanguage(models.Model):
 
 class CommunityModerator(models.Model):
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    person = models.ForeignKey("Person", models.DO_NOTHING)
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "community_moderator"
-        unique_together = (("community", "person"),)
+        unique_together = (("person", "community"),)
 
 
 class CommunityPersonBan(models.Model):
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    person = models.ForeignKey("Person", models.DO_NOTHING)
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
     expires = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = "community_person_ban"
-        unique_together = (("community", "person"),)
+        unique_together = (("person", "community"),)
 
 
 class CustomEmoji(models.Model):
@@ -281,7 +274,7 @@ class CustomEmoji(models.Model):
 
 
 class CustomEmojiKeyword(models.Model):
-    custom_emoji = models.ForeignKey(CustomEmoji, models.DO_NOTHING)
+    custom_emoji = models.OneToOneField(CustomEmoji, models.DO_NOTHING, primary_key=True)
     keyword = models.CharField(max_length=128)
 
     class Meta:
@@ -302,7 +295,7 @@ class EmailVerification(models.Model):
 
 
 class FederationAllowlist(models.Model):
-    instance = models.OneToOneField("Instance", models.DO_NOTHING)
+    instance = models.OneToOneField("Instance", models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
     updated = models.DateTimeField(blank=True, null=True)
 
@@ -312,13 +305,36 @@ class FederationAllowlist(models.Model):
 
 
 class FederationBlocklist(models.Model):
-    instance = models.OneToOneField("Instance", models.DO_NOTHING)
+    instance = models.OneToOneField("Instance", models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
     updated = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = "federation_blocklist"
+
+
+class FederationQueueState(models.Model):
+    instance = models.OneToOneField("Instance", models.DO_NOTHING, primary_key=True)
+    last_successful_id = models.BigIntegerField(blank=True, null=True)
+    fail_count = models.IntegerField()
+    last_retry = models.DateTimeField(blank=True, null=True)
+    last_successful_published_time = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "federation_queue_state"
+
+
+class ImageUpload(models.Model):
+    local_user = models.ForeignKey("LocalUser", models.DO_NOTHING)
+    pictrs_alias = models.TextField(primary_key=True)
+    pictrs_delete_token = models.TextField()
+    published = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "image_upload"
 
 
 class Instance(models.Model):
@@ -331,16 +347,20 @@ class Instance(models.Model):
     def __str__(self):
         return self.domain
 
-    def _get_client(self):
-        return Lemmy(f"https://{self.domain}", raise_exceptions=True)
-
-    @classmethod
-    def get_reddit_mirror(cls):
-        return cls.objects.get(domain=settings.LEMMY_MIRROR_INSTANCE_DOMAIN)
-
     class Meta:
         managed = False
         db_table = "instance"
+
+
+class InstanceBlock(models.Model):
+    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    instance = models.ForeignKey(Instance, models.DO_NOTHING)
+    published = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "instance_block"
+        unique_together = (("person", "instance"),)
 
 
 class Language(models.Model):
@@ -355,6 +375,17 @@ class Language(models.Model):
         db_table = "language"
 
 
+class LocalImage(models.Model):
+    local_user = models.ForeignKey("LocalUser", models.DO_NOTHING, blank=True, null=True)
+    pictrs_alias = models.TextField(primary_key=True)
+    pictrs_delete_token = models.TextField()
+    published = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "local_image"
+
+
 class LocalSite(models.Model):
     site = models.OneToOneField("Site", models.DO_NOTHING)
     site_setup = models.BooleanField()
@@ -365,7 +396,7 @@ class LocalSite(models.Model):
     application_question = models.TextField(blank=True, null=True)
     private_instance = models.BooleanField()
     default_theme = models.TextField()
-    default_post_listing_type = models.TextField()  # This field type is a guess.
+    default_post_listing_type = models.TextField()
     legal_information = models.TextField(blank=True, null=True)
     hide_modlog_mod_names = models.BooleanField()
     application_email_admins = models.BooleanField()
@@ -376,8 +407,11 @@ class LocalSite(models.Model):
     captcha_difficulty = models.CharField(max_length=255)
     published = models.DateTimeField()
     updated = models.DateTimeField(blank=True, null=True)
-    registration_mode = models.TextField()  # This field type is a guess.
+    registration_mode = models.TextField()
     reports_email_admins = models.BooleanField()
+    federation_signed_fetch = models.BooleanField()
+    default_post_listing_mode = models.TextField()
+    default_sort_type = models.TextField()
 
     class Meta:
         managed = False
@@ -385,7 +419,7 @@ class LocalSite(models.Model):
 
 
 class LocalSiteRateLimit(models.Model):
-    local_site = models.OneToOneField(LocalSite, models.DO_NOTHING)
+    local_site = models.OneToOneField(LocalSite, models.DO_NOTHING, primary_key=True)
     message = models.IntegerField()
     message_per_second = models.IntegerField()
     post = models.IntegerField()
@@ -400,34 +434,51 @@ class LocalSiteRateLimit(models.Model):
     search_per_second = models.IntegerField()
     published = models.DateTimeField()
     updated = models.DateTimeField(blank=True, null=True)
+    import_user_settings = models.IntegerField()
+    import_user_settings_per_second = models.IntegerField()
 
     class Meta:
         managed = False
         db_table = "local_site_rate_limit"
 
 
+class LocalSiteUrlBlocklist(models.Model):
+    url = models.TextField(unique=True)
+    published = models.DateTimeField()
+    updated = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "local_site_url_blocklist"
+
+
 class LocalUser(models.Model):
     person = models.OneToOneField("Person", models.DO_NOTHING)
     password_encrypted = models.TextField()
     email = models.TextField(unique=True, blank=True, null=True)
-    show_nsfw = models.BooleanField(default=False)
-    theme = models.TextField(default="browser")
-    default_sort_type = models.TextField(default="Active")
-    default_listing_type = models.TextField(default="Local")
+    show_nsfw = models.BooleanField()
+    theme = models.TextField()
+    default_sort_type = models.TextField()
+    default_listing_type = models.TextField()
     interface_language = models.CharField(max_length=20)
-    show_avatars = models.BooleanField(default=True)
-    send_notifications_to_email = models.BooleanField(default=False)
-    validator_time = models.DateTimeField(auto_now_add=True)
-    show_scores = models.BooleanField(default=False)
-    show_bot_accounts = models.BooleanField(default=True)
-    show_read_posts = models.BooleanField(default=False)
-    show_new_post_notifs = models.BooleanField(default=False)
-    email_verified = models.BooleanField(default=False)
-    accepted_application = models.BooleanField(default=False)
+    show_avatars = models.BooleanField()
+    send_notifications_to_email = models.BooleanField()
+    show_scores = models.BooleanField()
+    show_bot_accounts = models.BooleanField()
+    show_read_posts = models.BooleanField()
+    email_verified = models.BooleanField()
+    accepted_application = models.BooleanField()
     totp_2fa_secret = models.TextField(blank=True, null=True)
-    totp_2fa_url = models.TextField(blank=True, null=True)
-    open_links_in_new_tab = models.BooleanField(default=True)
-    infinite_scroll_enabled = models.BooleanField(default=False)
+    open_links_in_new_tab = models.BooleanField()
+    blur_nsfw = models.BooleanField()
+    auto_expand = models.BooleanField()
+    infinite_scroll_enabled = models.BooleanField()
+    admin = models.BooleanField()
+    post_listing_mode = models.TextField()
+    totp_2fa_enabled = models.BooleanField()
+    enable_keyboard_navigation = models.BooleanField()
+    enable_animated_images = models.BooleanField()
+    collapse_bot_comments = models.BooleanField()
 
     def __str__(self):
         return self.person.name
@@ -438,7 +489,7 @@ class LocalUser(models.Model):
 
 
 class LocalUserLanguage(models.Model):
-    local_user = models.ForeignKey(LocalUser, models.DO_NOTHING)
+    local_user = models.OneToOneField(LocalUser, models.DO_NOTHING, primary_key=True)
     language = models.ForeignKey(Language, models.DO_NOTHING)
 
     class Meta:
@@ -447,15 +498,37 @@ class LocalUserLanguage(models.Model):
         unique_together = (("local_user", "language"),)
 
 
+class LocalUserVoteDisplayMode(models.Model):
+    local_user = models.OneToOneField(LocalUser, models.DO_NOTHING, primary_key=True)
+    score = models.BooleanField()
+    upvotes = models.BooleanField()
+    downvotes = models.BooleanField()
+    upvote_percentage = models.BooleanField()
+
+    class Meta:
+        managed = False
+        db_table = "local_user_vote_display_mode"
+
+
+class LoginToken(models.Model):
+    token = models.TextField(primary_key=True)
+    user = models.ForeignKey(LocalUser, models.DO_NOTHING)
+    published = models.DateTimeField()
+    ip = models.TextField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "login_token"
+
+
 class ModAdd(models.Model):
     mod_person = models.ForeignKey("Person", models.DO_NOTHING)
     other_person = models.ForeignKey(
         "Person", models.DO_NOTHING, related_name="modadd_other_person_set"
     )
     removed = models.BooleanField()
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -469,9 +542,7 @@ class ModAddCommunity(models.Model):
     )
     community = models.ForeignKey(Community, models.DO_NOTHING)
     removed = models.BooleanField()
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -486,9 +557,7 @@ class ModBan(models.Model):
     reason = models.TextField(blank=True, null=True)
     banned = models.BooleanField()
     expires = models.DateTimeField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -504,9 +573,7 @@ class ModBanFromCommunity(models.Model):
     reason = models.TextField(blank=True, null=True)
     banned = models.BooleanField()
     expires = models.DateTimeField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -517,9 +584,7 @@ class ModFeaturePost(models.Model):
     mod_person = models.ForeignKey("Person", models.DO_NOTHING)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     featured = models.BooleanField()
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
     is_featured_community = models.BooleanField()
 
     class Meta:
@@ -530,9 +595,7 @@ class ModFeaturePost(models.Model):
 class ModHideCommunity(models.Model):
     community = models.ForeignKey(Community, models.DO_NOTHING)
     mod_person = models.ForeignKey("Person", models.DO_NOTHING)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
     reason = models.TextField(blank=True, null=True)
     hidden = models.BooleanField()
 
@@ -545,9 +608,7 @@ class ModLockPost(models.Model):
     mod_person = models.ForeignKey("Person", models.DO_NOTHING)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     locked = models.BooleanField()
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -559,9 +620,7 @@ class ModRemoveComment(models.Model):
     comment = models.ForeignKey(Comment, models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
     removed = models.BooleanField()
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -573,10 +632,7 @@ class ModRemoveCommunity(models.Model):
     community = models.ForeignKey(Community, models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
     removed = models.BooleanField()
-    expires = models.DateTimeField(blank=True, null=True)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -588,9 +644,7 @@ class ModRemovePost(models.Model):
     post = models.ForeignKey("Post", models.DO_NOTHING)
     reason = models.TextField(blank=True, null=True)
     removed = models.BooleanField()
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -603,9 +657,7 @@ class ModTransferCommunity(models.Model):
         "Person", models.DO_NOTHING, related_name="modtransfercommunity_other_person_set"
     )
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    when_field = models.DateTimeField(
-        db_column="when_"
-    )  # Field renamed because it ended with '_'.
+    when_field = models.DateTimeField(db_column="when_")
 
     class Meta:
         managed = False
@@ -613,7 +665,7 @@ class ModTransferCommunity(models.Model):
 
 
 class PasswordResetRequest(models.Model):
-    token_encrypted = models.TextField()
+    token = models.TextField()
     published = models.DateTimeField()
     local_user = models.ForeignKey(LocalUser, models.DO_NOTHING)
 
@@ -637,10 +689,9 @@ class Person(models.Model):
     last_refreshed_at = models.DateTimeField()
     banner = models.TextField(blank=True, null=True)
     deleted = models.BooleanField()
-    inbox_url = models.CharField(unique=True, max_length=255)
+    inbox_url = models.CharField(max_length=255)
     shared_inbox_url = models.CharField(max_length=255, blank=True, null=True)
     matrix_user_id = models.TextField(blank=True, null=True)
-    admin = models.BooleanField()
     bot_account = models.BooleanField()
     ban_expires = models.DateTimeField(blank=True, null=True)
     instance = models.ForeignKey(Instance, models.DO_NOTHING)
@@ -654,7 +705,7 @@ class Person(models.Model):
 
 
 class PersonAggregates(models.Model):
-    person = models.OneToOneField(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     post_count = models.BigIntegerField()
     post_score = models.BigIntegerField()
     comment_count = models.BigIntegerField()
@@ -666,7 +717,7 @@ class PersonAggregates(models.Model):
 
 
 class PersonBan(models.Model):
-    person = models.OneToOneField(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
@@ -675,7 +726,7 @@ class PersonBan(models.Model):
 
 
 class PersonBlock(models.Model):
-    person = models.ForeignKey(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     target = models.ForeignKey(Person, models.DO_NOTHING, related_name="personblock_target_set")
     published = models.DateTimeField()
 
@@ -687,8 +738,8 @@ class PersonBlock(models.Model):
 
 class PersonFollower(models.Model):
     person = models.ForeignKey(Person, models.DO_NOTHING)
-    follower = models.ForeignKey(
-        Person, models.DO_NOTHING, related_name="personfollower_follower_set"
+    follower = models.OneToOneField(
+        Person, models.DO_NOTHING, primary_key=True, related_name="personfollower_follower_set"
     )
     published = models.DateTimeField()
     pending = models.BooleanField()
@@ -712,7 +763,7 @@ class PersonMention(models.Model):
 
 
 class PersonPostAggregates(models.Model):
-    person = models.ForeignKey(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     read_comments = models.BigIntegerField()
     published = models.DateTimeField()
@@ -744,6 +795,8 @@ class Post(models.Model):
     language = models.ForeignKey(Language, models.DO_NOTHING)
     featured_community = models.BooleanField()
     featured_local = models.BooleanField()
+    url_content_type = models.TextField(blank=True, null=True)
+    alt_text = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -751,7 +804,7 @@ class Post(models.Model):
 
 
 class PostAggregates(models.Model):
-    post = models.OneToOneField(Post, models.DO_NOTHING)
+    post = models.OneToOneField(Post, models.DO_NOTHING, primary_key=True)
     comments = models.BigIntegerField()
     score = models.BigIntegerField()
     upvotes = models.BigIntegerField()
@@ -761,37 +814,51 @@ class PostAggregates(models.Model):
     newest_comment_time = models.DateTimeField()
     featured_community = models.BooleanField()
     featured_local = models.BooleanField()
-    hot_rank = models.IntegerField()
-    hot_rank_active = models.IntegerField()
+    hot_rank = models.FloatField()
+    hot_rank_active = models.FloatField()
     community = models.ForeignKey(Community, models.DO_NOTHING)
     creator = models.ForeignKey(Person, models.DO_NOTHING)
+    controversy_rank = models.FloatField()
+    instance = models.ForeignKey(Instance, models.DO_NOTHING)
+    scaled_rank = models.FloatField()
 
     class Meta:
         managed = False
         db_table = "post_aggregates"
 
 
+class PostHide(models.Model):
+    post = models.ForeignKey(Post, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
+    published = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "post_hide"
+        unique_together = (("person", "post"),)
+
+
 class PostLike(models.Model):
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.ForeignKey(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     score = models.SmallIntegerField()
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_like"
-        unique_together = (("post", "person"),)
+        unique_together = (("person", "post"),)
 
 
 class PostRead(models.Model):
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.ForeignKey(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_read"
-        unique_together = (("post", "person"),)
+        unique_together = (("person", "post"),)
 
 
 class PostReport(models.Model):
@@ -816,13 +883,13 @@ class PostReport(models.Model):
 
 class PostSaved(models.Model):
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.ForeignKey(Person, models.DO_NOTHING)
+    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_saved"
-        unique_together = (("post", "person"),)
+        unique_together = (("person", "post"),)
 
 
 class PrivateMessage(models.Model):
@@ -866,8 +933,7 @@ class PrivateMessageReport(models.Model):
 
 
 class ReceivedActivity(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    ap_id = models.TextField(unique=True)
+    ap_id = models.TextField(primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
@@ -887,6 +953,15 @@ class RegistrationApplication(models.Model):
         db_table = "registration_application"
 
 
+class RemoteImage(models.Model):
+    link = models.TextField(unique=True)
+    published = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "remote_image"
+
+
 class Secret(models.Model):
     jwt_secret = models.CharField()
 
@@ -898,9 +973,14 @@ class Secret(models.Model):
 class SentActivity(models.Model):
     id = models.BigAutoField(primary_key=True)
     ap_id = models.TextField(unique=True)
-    data = models.TextField()  # This field type is a guess.
+    data = models.TextField()
     sensitive = models.BooleanField()
     published = models.DateTimeField()
+    send_inboxes = models.TextField()
+    send_community_followers_of = models.IntegerField(blank=True, null=True)
+    send_all_instances = models.BooleanField()
+    actor_type = models.TextField()
+    actor_apub_id = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -908,7 +988,7 @@ class SentActivity(models.Model):
 
 
 class Site(models.Model):
-    name = models.CharField(unique=True, max_length=20)
+    name = models.CharField(max_length=20)
     sidebar = models.TextField(blank=True, null=True)
     published = models.DateTimeField()
     updated = models.DateTimeField(blank=True, null=True)
@@ -921,6 +1001,7 @@ class Site(models.Model):
     private_key = models.TextField(blank=True, null=True)
     public_key = models.TextField()
     instance = models.OneToOneField(Instance, models.DO_NOTHING)
+    content_warning = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -928,7 +1009,7 @@ class Site(models.Model):
 
 
 class SiteAggregates(models.Model):
-    site = models.ForeignKey(Site, models.DO_NOTHING)
+    site = models.OneToOneField(Site, models.DO_NOTHING, primary_key=True)
     users = models.BigIntegerField()
     posts = models.BigIntegerField()
     comments = models.BigIntegerField()
@@ -944,7 +1025,7 @@ class SiteAggregates(models.Model):
 
 
 class SiteLanguage(models.Model):
-    site = models.ForeignKey(Site, models.DO_NOTHING)
+    site = models.OneToOneField(Site, models.DO_NOTHING, primary_key=True)
     language = models.ForeignKey(Language, models.DO_NOTHING)
 
     class Meta:

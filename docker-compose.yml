@@ -1,14 +1,57 @@
 version: '3.7'
 
+x-internal-service: &internal-service
+  networks:
+    - internal
+
 x-fediverser-service: &fediverser-service
+  <<: *internal-service
   image: "fediverser/app:${TAG:-latest}"
   command: poetry run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0
 
   environment: &fediverser-service-environment
     DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
     FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
+    FEDIVERSER_STATIC_ROOT: /var/fediverser/static
+    FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
+    FEDIVERSER_BROKER_URL: redis://broker:6379/0
+    FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
+    FEDIVERSER_CACHE_LOCATION: redis://cache:6379/0
+    FEDIVERSER_CORS_HEADERS_ENABLED: 1
+
+  volumes: &fediverser-service-volumes
+    - static-data:/var/fediverser/static
+    - media-data:/var/fediverser/media
 
 services:
+  db:
+    <<: *internal-service
+    image: postgres:16
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+
+  broker:
+    <<: *internal-service
+    image: redis:latest
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - broker-data:/data
+
+  cache:
+    <<: *internal-service
+    image: redis:latest
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - cache-data:/data
+
   admin:
     <<: *fediverser-service
 
@@ -45,3 +88,15 @@ services:
   init_collect_static:
     <<: *fediverser-service
     command: poetry run django-admin collectstatic --no-input
+
+
+
+networks:
+  internal:
+
+volumes:
+  static-data:
+  media-data:
+  postgresql-data:
+  broker-data:
+  cache-data:

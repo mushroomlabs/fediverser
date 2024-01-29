@@ -22,6 +22,7 @@ from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 from model_utils.models import StatusModel, TimeStampedModel
 from praw import Reddit
+from pythorhead import Lemmy
 from pythorhead.types import LanguageType
 
 from fediverser.apps.lemmy import models as lemmy_models
@@ -35,7 +36,6 @@ from .exceptions import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 LEMMY_CLIENTS = {}
 User = get_user_model()
@@ -59,24 +59,85 @@ def make_reddit_user_client(social_application, refresh_token):
     )
 
 
-def make_lemmy_proxy_client():
-    global LEMMY_CLIENTS
+def get_lemmy_instance():
+    return lemmy_models.Instance.objects.get(domain=settings.LEMMY_MIRROR_INSTANCE_DOMAIN)
 
-    LemmyInstance.make_proxy_user()
 
+def make_proxy_user():
     username = settings.LEMMY_MIRROR_PROXY_USERNAME
     password = settings.LEMMY_MIRROR_PROXY_PASSWORD
+
+    try:
+        assert username is not None, "Proxy user is not properly configured"
+        assert password is not None, "Proxy user does not have a password"
+    except AssertionError:
+        raise LemmyProxyUserNotConfigured()
+
+    lemmy_mirror = get_lemmy_instance()
+    if lemmy_mirror is None:
+        logger.warning("Lemmy Mirror instance is not properly configured")
+        return
+
+    proxy_user = lemmy_models.LocalUser.objects.filter(
+        person__name=username, person__instance=lemmy_mirror
+    ).first()
+
+    if proxy_user is not None:
+        return proxy_user
+
+    private_key, public_key = generate_rsa_keypair()
+
+    person, _ = lemmy_models.Person.objects.get_or_create(
+        name=username,
+        instance=lemmy_mirror,
+        defaults={
+            "actor_id": f"https://{lemmy_mirror.domain}/u/{username}",
+            "inbox_url": f"https://{lemmy_mirror.domain}/u/{username}/inbox",
+            "shared_inbox_url": f"https://{lemmy_mirror.domain}/inbox",
+            "private_key": private_key,
+            "public_key": public_key,
+            "published": timezone.now(),
+            "last_refreshed_at": timezone.now(),
+            "local": True,
+            "bot_account": True,
+            "deleted": False,
+            "banned": False,
+            "admin": False,
+        },
+    )
+    proxy_user, _ = lemmy_models.LocalUser.objects.update_or_create(
+        person=person,
+        defaults={
+            "password_encrypted": get_hashed_password(password),
+            "accepted_application": True,
+        },
+    )
+
+    return proxy_user
+
+
+def make_lemmy_client(username, password):
+    global LEMMY_CLIENTS
 
     if username in LEMMY_CLIENTS:
         return LEMMY_CLIENTS[username]
 
-    lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+    domain = settings.LEMMY_MIRROR_INSTANCE_DOMAIN
 
-    lemmy_client = lemmy_mirror._get_client()
+    lemmy_client = Lemmy(f"https://{domain}", raise_exceptions=True)
     lemmy_client.log_in(username, password)
     LEMMY_CLIENTS[username] = lemmy_client
 
     return lemmy_client
+
+
+def make_lemmy_proxy_client():
+    make_proxy_user()
+
+    return make_lemmy_client(
+        username=settings.LEMMY_MIRROR_PROXY_USERNAME,
+        password=settings.LEMMY_MIRROR_PROXY_PASSWORD,
+    )
 
 
 def make_password():
@@ -103,59 +164,6 @@ class LemmyInstance(models.Model):
     @property
     def mirroring(self):
         return lemmy_models.Instance.objects.filter(domain=self.domain).first()
-
-    @staticmethod
-    def make_proxy_user():
-        username = settings.LEMMY_MIRROR_PROXY_USERNAME
-        password = settings.LEMMY_MIRROR_PROXY_PASSWORD
-
-        try:
-            assert username is not None, "Proxy user is not properly configured"
-            assert password is not None, "Proxy user does not have a password"
-        except AssertionError:
-            raise LemmyProxyUserNotConfigured()
-
-        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
-        if lemmy_mirror is None:
-            logger.warning("Lemmy Mirror instance is not properly configured")
-            return
-
-        proxy_user = lemmy_models.LocalUser.objects.filter(
-            person__name=username, person__instance=lemmy_mirror
-        ).first()
-
-        if proxy_user is not None:
-            return proxy_user
-
-        private_key, public_key = generate_rsa_keypair()
-
-        person, _ = lemmy_models.Person.objects.get_or_create(
-            name=username,
-            instance=lemmy_mirror,
-            defaults={
-                "actor_id": f"https://{lemmy_mirror.domain}/u/{username}",
-                "inbox_url": f"https://{lemmy_mirror.domain}/u/{username}/inbox",
-                "shared_inbox_url": f"https://{lemmy_mirror.domain}/inbox",
-                "private_key": private_key,
-                "public_key": public_key,
-                "published": timezone.now(),
-                "last_refreshed_at": timezone.now(),
-                "local": True,
-                "bot_account": True,
-                "deleted": False,
-                "banned": False,
-                "admin": False,
-            },
-        )
-        proxy_user, _ = lemmy_models.LocalUser.objects.update_or_create(
-            person=person,
-            defaults={
-                "password_encrypted": get_hashed_password(password),
-                "accepted_application": True,
-            },
-        )
-
-        return proxy_user
 
     def __str__(self):
         return self.domain
@@ -286,7 +294,7 @@ class RedditAccount(models.Model):
 
     @property
     def is_initial_password_in_use(self):
-        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        lemmy_mirror = get_lemmy_instance()
         if lemmy_mirror is None:
             logger.warning("Lemmy Mirror instance is not properly configured")
             return False
@@ -311,7 +319,7 @@ class RedditAccount(models.Model):
         )
 
     def unbot_mirror(self):
-        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        lemmy_mirror = get_lemmy_instance()
         if lemmy_mirror is None:
             logger.warning("Lemmy Mirror instance is not properly configured")
             return
@@ -321,7 +329,7 @@ class RedditAccount(models.Model):
         )
 
     def register_mirror(self, as_bot=True):
-        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+        lemmy_mirror = get_lemmy_instance()
         if lemmy_mirror is None:
             logger.warning("Lemmy Mirror instance is not properly configured")
             return
@@ -343,7 +351,6 @@ class RedditAccount(models.Model):
                 "bot_account": as_bot,
                 "deleted": False,
                 "banned": False,
-                "admin": False,
             },
         )
         local_user, _ = lemmy_models.LocalUser.objects.update_or_create(
@@ -359,18 +366,7 @@ class RedditAccount(models.Model):
         return lemmy_models.LocalUser.objects.get(person__name=self.username)
 
     def make_lemmy_client(self):
-        global LEMMY_CLIENTS
-
-        if self.username in LEMMY_CLIENTS:
-            return LEMMY_CLIENTS[self.username]
-
-        lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
-
-        lemmy_client = lemmy_mirror._get_client()
-        lemmy_client.log_in(self.username, self.password)
-        LEMMY_CLIENTS[self.username] = lemmy_client
-
-        return lemmy_client
+        return make_lemmy_client(self.username, self.password)
 
     @classmethod
     def make(cls, redditor: praw.models.Redditor):
@@ -821,7 +817,7 @@ class LemmyMirroredPost(TimeStampedModel):
 
     def submit_disclosure_comment(self):
         try:
-            lemmy_mirror = lemmy_models.Instance.get_reddit_mirror()
+            lemmy_mirror = get_lemmy_instance()
             client = make_lemmy_proxy_client()
             logger.info(
                 f"Submitting disclosure comment for reddit post {self.reddit_submission.id}"

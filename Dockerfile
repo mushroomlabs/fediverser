@@ -1,27 +1,30 @@
 # Start with a Python image.
 FROM python:3.11-slim-bookworm AS fediverser_base
 
-ENV PYTHONFAULTHANDLER=1 \
-  PYTHONUNBUFFERED=1 \
-  PIP_NO_CACHE_DIR=off \
-  PIP_DISABLE_PIP_VERSION_CHECK=on \
-  POETRY_VIRTUALENVS_CREATE=false \
-  POETRY_CACHE_DIR='/var/cache/pypoetry'
+# Install poetry
+RUN pip install poetry
 
-# Copy all relevant files into the image.
-COPY ./fediverser /app/fediverser
-COPY ./README.md /app
-COPY ./pyproject.toml /app
-COPY ./pytest.ini /app
-COPY ./poetry.lock /app
-COPY ./setup.cfg /app/fediverse
-WORKDIR /app
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_CACHE_DIR='/var/cache/pypoetry'
 
 RUN apt-get update
 RUN apt-get install build-essential cargo -y
 
-# Install poetry
-RUN pip install poetry
+WORKDIR /app
+COPY ./pyproject.toml /app
+COPY ./poetry.lock /app
+
+RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
+
+# Copy all relevant files into the image.
+COPY ./fediverser /app/fediverser
+COPY ./pytest.ini /app
+COPY ./README.md /app
+COPY ./setup.cfg /app/fediverse
 
 # Use poetry to install all dependencies
-RUN poetry install
+RUN poetry install  --without dev
