@@ -41,6 +41,7 @@ THIRD_PARTY_APPS = (
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.reddit",
+    "rest_framework",
 )
 
 INTERNAL_APPS = (

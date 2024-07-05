@@ -1,5 +1,7 @@
 from django.db import models
 
+from . import choices
+
 
 class DieselSchemaMigrations(models.Model):
     version = models.CharField(primary_key=True, max_length=50)
@@ -456,29 +458,41 @@ class LocalUser(models.Model):
     person = models.OneToOneField("Person", models.DO_NOTHING)
     password_encrypted = models.TextField()
     email = models.TextField(unique=True, blank=True, null=True)
-    show_nsfw = models.BooleanField()
-    theme = models.TextField()
-    default_sort_type = models.TextField()
-    default_listing_type = models.TextField()
-    interface_language = models.CharField(max_length=20)
-    show_avatars = models.BooleanField()
-    send_notifications_to_email = models.BooleanField()
-    show_scores = models.BooleanField()
-    show_bot_accounts = models.BooleanField()
-    show_read_posts = models.BooleanField()
-    email_verified = models.BooleanField()
-    accepted_application = models.BooleanField()
+    show_nsfw = models.BooleanField(default=False)
+    theme = models.TextField(default="browser")
+    default_sort_type = models.CharField(
+        max_length=30,
+        choices=choices.SortOrderTypes.choices,
+        default=choices.SortOrderTypes.ACTIVE,
+    )
+    default_listing_type = models.CharField(
+        max_length=30,
+        choices=choices.ListingTypes.choices,
+        default=choices.ListingTypes.LOCAL,
+    )
+    interface_language = models.CharField(max_length=20, default="browser")
+    show_avatars = models.BooleanField(default=True)
+    send_notifications_to_email = models.BooleanField(default=False)
+    show_scores = models.BooleanField(default=True)
+    show_bot_accounts = models.BooleanField(default=True)
+    show_read_posts = models.BooleanField(default=True)
+    email_verified = models.BooleanField(default=False)
+    accepted_application = models.BooleanField(default=False)
     totp_2fa_secret = models.TextField(blank=True, null=True)
-    open_links_in_new_tab = models.BooleanField()
-    blur_nsfw = models.BooleanField()
-    auto_expand = models.BooleanField()
-    infinite_scroll_enabled = models.BooleanField()
-    admin = models.BooleanField()
-    post_listing_mode = models.TextField()
-    totp_2fa_enabled = models.BooleanField()
-    enable_keyboard_navigation = models.BooleanField()
-    enable_animated_images = models.BooleanField()
-    collapse_bot_comments = models.BooleanField()
+    open_links_in_new_tab = models.BooleanField(default=False)
+    blur_nsfw = models.BooleanField(default=True)
+    auto_expand = models.BooleanField(default=False)
+    infinite_scroll_enabled = models.BooleanField(default=False)
+    admin = models.BooleanField(default=False)
+    post_listing_mode = models.CharField(
+        max_length=30,
+        choices=choices.PostListingModes.choices,
+        default=choices.PostListingModes.LIST,
+    )
+    totp_2fa_enabled = models.BooleanField(default=False)
+    enable_keyboard_navigation = models.BooleanField(default=False)
+    enable_animated_images = models.BooleanField(default=True)
+    collapse_bot_comments = models.BooleanField(default=False)
 
     def __str__(self):
         return self.person.name
@@ -500,10 +514,10 @@ class LocalUserLanguage(models.Model):
 
 class LocalUserVoteDisplayMode(models.Model):
     local_user = models.OneToOneField(LocalUser, models.DO_NOTHING, primary_key=True)
-    score = models.BooleanField()
-    upvotes = models.BooleanField()
-    downvotes = models.BooleanField()
-    upvote_percentage = models.BooleanField()
+    score = models.BooleanField(default=False)
+    upvotes = models.BooleanField(default=True)
+    downvotes = models.BooleanField(default=True)
+    upvote_percentage = models.BooleanField(default=False)
 
     class Meta:
         managed = False

@@ -102,7 +102,6 @@ def make_proxy_user():
             "bot_account": True,
             "deleted": False,
             "banned": False,
-            "admin": False,
         },
     )
     proxy_user, _ = lemmy_models.LocalUser.objects.update_or_create(
@@ -156,6 +155,22 @@ def get_hashed_password(cleartext: str) -> str:
     salt = bcrypt.gensalt()
     hashed_bytes = bcrypt.hashpw(cleartext.encode(), salt=salt)
     return hashed_bytes.decode()
+
+
+class UserAccount(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, related_name="account", on_delete=models.CASCADE
+    )
+    lemmy_local_username = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
+    @property
+    def lemmy_local_user(self):
+        return lemmy_models.LocalUser.objects.filter(
+            person__name=self.lemmy_local_username
+        ).first()
+
+    def check_lemmy_password(self, cleartext):
+        return bool(self.lemmy_local_user) and self.lemmy_local_user.check_password(cleartext)
 
 
 class LemmyInstance(models.Model):
@@ -353,13 +368,18 @@ class RedditAccount(models.Model):
                 "banned": False,
             },
         )
-        local_user, _ = lemmy_models.LocalUser.objects.update_or_create(
+        local_user, created = lemmy_models.LocalUser.objects.get_or_create(
             person=person,
             defaults={
                 "password_encrypted": get_hashed_password(self.password),
                 "accepted_application": True,
             },
         )
+
+        if created:
+            lemmy_models.LocalUserVoteDisplayMode.objects.create(local_user=local_user)
+
+        return local_user
 
     @property
     def mirror_lemmy_user(self):

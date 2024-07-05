@@ -1,5 +1,5 @@
 # Start with a Python image.
-FROM python:3.11-slim-bookworm AS fediverser_base
+FROM python:3.12-slim-bookworm AS fediverser_base
 
 # Install poetry
 RUN pip install poetry
@@ -26,5 +26,8 @@ COPY ./pytest.ini /app
 COPY ./README.md /app
 COPY ./setup.cfg /app/fediverse
 
-# Use poetry to install all dependencies
-RUN poetry install  --without dev
+FROM fediverser_base AS release
+RUN poetry install --without dev
+
+FROM fediverser_base AS development
+RUN poetry install

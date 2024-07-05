@@ -20,6 +20,7 @@ x-fediverser-dev: &fediverser-dev-service
   tty: true
   build:
     context: .
+    target: development
   restart: unless-stopped
 
   depends_on: &fediverser-service-dependencies
@@ -79,6 +80,8 @@ services:
 
   admin:
     <<: [*fediverser-dev-service, *fediverser-webservice]
+    ports:
+      - "8000:80"
 
   portal:
     <<: [*fediverser-dev-service, *fediverser-webservice]
@@ -108,7 +111,7 @@ services:
     <<: [*fediverser-development, *lemmy-service]
     image: dessalines/lemmy:0.19.5
     environment:
-      - RUST_LOG="warn,lemmy_server=info,lemmy_api=info,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info,lemmy_websocket=info"
+      - RUST_LOG="warn,lemmy_server=info,lemmy_api=debug,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info"
     volumes:
       - lemmy-config-data:/config/
     depends_on:
