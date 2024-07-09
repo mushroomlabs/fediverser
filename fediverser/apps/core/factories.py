@@ -6,36 +6,37 @@ import factory.fuzzy
 from django.db.models import signals
 from django.template.defaultfilters import slugify
 
-from . import models
+from .models.activitypub import Community, Instance
+from .models.reddit import RedditCommunity
 
 BASE36_ALPHABET = string.digits + string.ascii_lowercase
 
 
-class LemmyInstanceFactory(factory.django.DjangoModelFactory):
+class InstanceFactory(factory.django.DjangoModelFactory):
     domain = factory.Sequence(lambda n: f"{n:03}.example.com")
 
     class Meta:
-        model = models.LemmyInstance
+        model = Instance
 
 
-class LemmyCommunityFactory(factory.django.DjangoModelFactory):
-    instance = factory.SubFactory(LemmyInstanceFactory)
+class CommunityFactory(factory.django.DjangoModelFactory):
+    instance = factory.SubFactory(InstanceFactory)
     name = factory.Sequence(lambda n: f"community-{n:03}")
 
     class Meta:
-        model = models.LemmyCommunity
+        model = Community
 
 
 class RedditCommunityFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f"test-subreddit-{n:03}")
 
     class Meta:
-        model = models.RedditCommunity
+        model = RedditCommunity
 
 
 class RedditToLemmyCommunityFactory(factory.django.DjangoModelFactory):
     subreddit = factory.SubFactory(RedditCommunityFactory)
-    lemmy_community = factory.SubFactory(LemmyCommunityFactory)
+    community = factory.SubFactory(LemmyCommunityFactory)
 
     class Meta:
         model = models.RedditToLemmyCommunity

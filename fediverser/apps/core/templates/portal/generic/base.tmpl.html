@@ -1,0 +1,20 @@
+{% extends "portal/base.tmpl.html" %}
+
+{% load i18n wagtailadmin_tags %}
+
+{% block content %}
+  {% block header %}
+    {% block slim_header %}
+      {% if breadcrumbs_items %}
+        {% include "wagtailadmin/shared/headers/slim_header.html" %}
+      {% endif %}
+    {% endblock %}
+    {% block main_header %}
+      {% include "wagtailadmin/shared/header.html" with title=page_title subtitle=page_subtitle icon=header_icon only %}
+    {% endblock %}
+  {% endblock %}
+
+  <div class="nice-padding">
+    {% block main_content %}{% endblock %}
+  </div>
+{% endblock %}

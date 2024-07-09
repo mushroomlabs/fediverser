@@ -1,0 +1,40 @@
+{% extends "web/generic/base.tmpl.html" %}
+{% load i18n %}
+
+{% block content %}
+{% block header %}
+{% block slim_header %}
+{{ block.super }}
+{% endblock %}
+
+{% block main_header %}
+{% include "web/partials/header.tmpl.html" with title=page_title subtitle=page_subtitle action_url=header_action_url action_text=header_action_label icon=header_icon only %}
+{% endblock %}
+{% endblock %}
+
+<div class="nice-padding {% if filters %}filterable{% endif %}">
+  <div id="listing-results">
+    {% block listing %}
+    {% include view.results_template_name|default:"wagtailadmin/generic/listing_results.html" %}
+    {% endblock %}
+
+    {% if is_paginated %}
+    {% include "wagtailadmin/shared/pagination_nav.html" with items=page_obj linkurl=index_url %}
+    {% endif %}
+  </div>
+  {% if filters %}
+  {% include "wagtailadmin/shared/filters.html" %}
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ media.js }}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{{ media.css }}
+{% endblock %}

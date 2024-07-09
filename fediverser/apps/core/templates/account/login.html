@@ -1,0 +1,62 @@
+{% extends "portal/base.tmpl.html" %}
+{% load static wagtailcore_tags fediverser i18n allauth account %}
+
+{% block bodyclass %}login{% endblock %}
+
+{% block furniture %}
+<main class="content-wrapper" id="main">
+  <h1>
+    {% block branding_login %}
+    Sign in to {% site_name %}
+    {% endblock %}
+  </h1>
+
+  <div class="messages" role="status">
+    {# Always show messages div so it can be appended to by JS #}
+    {% if messages or form.errors %}
+    <ul>
+      {% if form.errors %}
+      {% for error in form.non_field_errors %}
+      <li class="error">{{ error }}</li>
+      {% endfor %}
+      {% endif %}
+      {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+  {% block above_login %}
+  {% endblock %}
+
+  <div class="login-form">
+    <p>
+      To access {% site_name %}, you need to use one of your existing
+      social media accounts, which we'll use to automatically connect
+      you to the Fediverse.
+    </p>
+
+    {% block login_form %}
+    {% csrf_token %}
+    {% url 'fediverser-core:home' as home_url %}
+    <input type="hidden" name="next" value="{{ next|default:home_url }}" />
+    <footer class="form-actions">
+      {% block submit_buttons %}
+      <a href="{% url 'fediverser-core:reddit-connection-setup' %}" class="button button-longrunning">
+        <em data-w-progress-target="label">{% trans 'Sign in via Reddit' %}</em>
+      </a>
+      {% endblock %}
+    </footer>
+    {% endblock %}
+  </div>
+
+  {% block below_login %}{% endblock %}
+
+  {% block branding_logo %}
+  <div class="login-logo">
+    <img src="{% static 'fediverser/images/fediverse-logo.png' %}" alt="Fediverver Network" />
+  </div>
+  {% endblock %}
+</main>
+{% endblock %}

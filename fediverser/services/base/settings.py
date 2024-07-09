@@ -42,6 +42,20 @@ THIRD_PARTY_APPS = (
     "allauth.socialaccount",
     "allauth.socialaccount.providers.reddit",
     "rest_framework",
+    "modelcluster",
+    "taggit",
+    "tree_queries",
+    "wagtail.contrib.forms",
+    "wagtail.contrib.routable_page",
+    "wagtail.sites",
+    "wagtail.documents",
+    "wagtail.snippets",
+    "wagtail.users",
+    "wagtail.images",
+    "wagtail.search",
+    "wagtail.admin",
+    "wagtail",
+    "wagtailautocomplete",
 )
 
 INTERNAL_APPS = (
@@ -160,7 +174,7 @@ REDDIT_BOT_ACCOUNT_PASSWORD = env.str("REDDIT_BOT_ACCOUNT_PASSWORD", default=Non
 
 # Authentication with third-party providers
 
-LOGIN_REDIRECT_URL = "web:home"
+LOGIN_REDIRECT_URL = "fediverser-core:portal-home"
 LOGIN_URL = "account_login"
 
 ACCOUNT_LOGOUT_ON_GET = True
@@ -175,9 +189,9 @@ SOCIALACCOUNT_PROVIDERS = {
         "SCOPE": [
             "identity",
             "mysubreddits",
-            "privatemessages",
-            "read",
-            "submit",
+            #            "privatemessages",
+            #            "read",
+            #            "submit",
         ],
         "USER_AGENT": env.str("FEDIVERSER_USER_AGENT", default=REDDIT_USER_AGENT),
     },
@@ -213,6 +227,14 @@ COMPRESS_ROOT = STATIC_ROOT = env.str(
 )
 MEDIA_ROOT = os.getenv("FEDIVERSER_MEDIA_ROOT", os.path.abspath(os.path.join(BASE_DIR, "media")))
 MEDIA_URL = os.getenv("FEDIVERSER_MEDIA_URL", "/media/")
+
+
+# Rest Framework
+REST_FRAMEWORK = {
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend"),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 100,
+}
 
 
 # Logging Configuration
@@ -256,8 +278,14 @@ for app in INTERNAL_APPS:
     }
 
 
-# Lemmy
-LEMMY_MIRROR_INSTANCE_DOMAIN = env.str("FEDIVERSER_LEMMY_MIRROR_INSTANCE", default=None)
-LEMMY_MIRROR_PROXY_USERNAME = env.str("FEDIVERSER_LEMMY_MIRROR_PROXY_USERNAME", default=None)
-LEMMY_MIRROR_PROXY_PASSWORD = env.str("FEDIVERSER_LEMMY_MIRROR_PROXY_PASSWORD", default=None)
-LEMMY_MIRROR_PORTAL_URL = env.str("FEDIVERSER_LEMMY_MIRROR_PORTAL_URL", default=None)
+# Instance-specific
+CONNECTED_LEMMY_INSTANCE_DOMAIN = env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None)
+FEDIVERSER_HUB_SITE = env.str("FEDIVERSER_HUB_SITE", default="https://fediverser.network")
+FEDIVERSER_BOT_USERNAME = env.str("FEDIVERSER_BOT_USERNAME", default=None)
+FEDIVERSER_BOT_PASSWORD = env.str("FEDIVERSER_BOT_PASSWORD", default=None)
+PORTAL_URL = env.str("FEDIVERSER_PORTAL_URL", default=None)
+SITE_NAME = env.str("FEDIVERSER_SITE_NAME", default="Fediverser Portal")
+
+
+# Wagtail
+WAGTAIL_SITE_NAME = SITE_NAME

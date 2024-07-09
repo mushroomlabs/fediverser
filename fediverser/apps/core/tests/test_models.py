@@ -5,7 +5,8 @@ from django.test import TestCase
 
 from fediverser.apps.core import factories
 from fediverser.apps.core.choices import AutomaticSubmissionPolicies
-from fediverser.apps.core.models import LemmyCommunity, LemmyInstance, RedditSubmission
+from fediverser.apps.core.models.activitypub import Community, Instance
+from fediverser.apps.core.models.reddit import RedditSubmission
 
 
 @pytest.mark.django_db(transaction=True)
@@ -35,8 +36,8 @@ class RedditToLemmyCommunityTestCase(BaseTestCase):
         self.assertTrue(poster.accepts_self_posts)
         self.assertFalse(poster.accepts_link_posts)
 
-    @patch.object(LemmyCommunity, "mirroring", None)
-    @patch.object(LemmyInstance, "mirroring", None)
+    @patch.object(Community, "mirroring", None)
+    @patch.object(Instance, "mirroring", None)
     def test_can_check_self_posts(self):
         poster = factories.RedditToLemmyCommunityFactory(
             automatic_submission_policy=AutomaticSubmissionPolicies.SELF_POST_ONLY
@@ -44,7 +45,7 @@ class RedditToLemmyCommunityTestCase(BaseTestCase):
 
         with patch.object(RedditSubmission, "post_to_lemmy", return_value=None):
             submission = factories.SelfPostFactory(subreddit=poster.subreddit)
-            self.assertTrue(poster.lemmy_community.can_accept_automatic_submission(submission))
+            self.assertTrue(poster.community.can_accept_automatic_submission(submission))
 
 
 class RedditSubmissionTestCase(BaseTestCase):

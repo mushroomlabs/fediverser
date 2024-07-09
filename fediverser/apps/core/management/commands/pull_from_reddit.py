@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from fediverser.apps.core.choices import AutomaticSubmissionPolicies
-from fediverser.apps.core.models import (
+from fediverser.apps.core.models.reddit import (
     RedditComment,
     RedditCommunity,
     RedditSubmission,

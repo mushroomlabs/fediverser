@@ -1,0 +1,76 @@
+{% extends "web/generic/base.tmpl.html" %}
+{% load fediverser %}
+
+{% block main_content %}
+<dl>
+  <dt>Community Page</dt>
+  <dd><a href="{{ object.url }}"}} target="_blank">{{ object.fqdn }}</a></dd>
+  {% if object.status %}
+  <dt>Status</dt>
+  <dd>{{ object.get_status_display }}</dd>
+  {% endif %}
+  {% if object.category %}
+  <dt>Category</dt>
+  <dd>{{ object.category.name }}</dd>
+  {% endif %}
+</dl>
+<hr />
+
+{% if object.status is None %}
+<h3>Current Status</h3>
+{% if not user|has_pending_community_status_change_request:object %}
+<p>This status of this community is unknown. You can help us by checking if the link above is still working. It not, please mark it as closed. If posts or comments in it are all older than 1 month, feel free to mark it as "Abandoned".
+</p>
+<form action="{% url 'fediverser:community-statusrecommendation-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in status_picker_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Status" class="button" />
+    </li>
+  </ul>
+</form>
+{% else %}
+<p>You already provided a status check! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
+{% endif %}
+{% endif %}
+
+{% if not object.category %}
+<h3>Category</h3>
+{% if not user|pending_community_category_proposal:object %}
+<p>This community has not been properly categorized yet. Please indicate the category which closest describe it:</p>
+<form action="{% url 'fediverser-core:community-categoryrecommendation-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in category_picker_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Category" class="button" />
+    </li>
+  </ul>
+</form>
+{% else %}
+<p>You already recommended a category! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
+{% endif %}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ status_picker_form.media.js }}
+{{ category_picker_form.media.js }}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{{ status_picker_form.media.css }}
+{{ category_picker_form.media.css }}
+{% endblock %}

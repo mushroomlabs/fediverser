@@ -1,0 +1,145 @@
+{% load static wagtailadmin_tags wagtailcore_tags fediverser i18n %}
+{% get_current_language as LANGUAGE_CODE %}
+{% get_current_language_bidi as LANGUAGE_BIDI %}
+
+<html lang="{{ LANGUAGE_CODE }}" dir="{% if LANGUAGE_BIDI %}rtl{% else %}ltr{% endif %}" class="{% admin_theme_classname %}">
+  <head>
+    <meta charset="utf-8" />
+    <title>{% block titletag %}Portal{% endblock %} - {% block branding_title %}{% site_name %}{% endblock %}</title>
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+
+    {% block css %}
+    <link rel="stylesheet" href="{% versioned_static 'wagtailadmin/css/core.css' %}">
+
+    {% hook_output 'insert_global_admin_css' %}
+
+    {% block extra_css %}{% endblock %}
+    {% endblock %}
+
+    {% block branding_favicon %}
+    <link rel="shortcut icon" href="{% static 'fediverser/images/fediverse-logo.ico' %}" />
+    {% endblock %}
+  </head>
+  {% sidebar_collapsed as sidebar_collapsed %}
+  {% fragment as bodyclass %}{% block bodyclass %}{% endblock %}{% endfragment %}
+  <body id="wagtail" class="{% classnames bodyclass sidebar_collapsed|yesno:"sidebar-collapsed," messages|yesno:"has-messages," %}" data-controller="w-init" data-w-init-ready-class="ready">
+    <div data-sprite></div>
+
+    <script src="{% versioned_static 'wagtailadmin/js/icons.js' %}" data-icon-url="{% url 'wagtailadmin_sprite' %}"></script>
+
+    <noscript class="capabilitymessage">
+      {% blocktrans trimmed %}
+      JavaScript is required to use Wagtail, but it is currently disabled.<br />
+      Here are the <a href="https://www.enable-javascript.com/" target="_blank" rel="noreferrer">instructions how to enable JavaScript in your web browser</a>.
+      {% endblocktrans %}
+    </noscript>
+
+    {% block js %}
+    <script>
+     (function(document, window) {
+       window.wagtailConfig = window.wagtailConfig || {};
+       wagtailConfig.ADMIN_API = {}
+
+       {% i18n_enabled as i18n_enabled %}
+       {% locales as locales %}
+       wagtailConfig.I18N_ENABLED = {% if i18n_enabled %}true{% else %}false{% endif %};
+       wagtailConfig.LOCALES = {{ locales|safe }};
+       {% if locale %}
+       wagtailConfig.ACTIVE_CONTENT_LOCALE = '{{ locale.language_code }}'
+       {% endif %}
+
+       wagtailConfig.STRINGS = {% js_translation_strings %};
+       wagtailConfig.ADMIN_URLS = {};
+     })(document, window);
+    </script>
+    {% wagtail_config as config %}
+    {{ config|json_script:"wagtail-config" }}
+    <script src="{% versioned_static 'wagtailadmin/js/vendor/jquery-3.6.0.min.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/vendor/jquery-ui-1.13.2.min.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/vendor/jquery.datetimepicker.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/vendor/bootstrap-transition.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/vendor/bootstrap-modal.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/vendor/tag-it.js' %}"></script>
+    <script src="{% url 'wagtailadmin_javascript_catalog' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/core.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/vendor.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/wagtailadmin.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/telepath/telepath.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/sidebar.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/modal-workflow.js' %}"></script>
+
+    {% hook_output 'insert_global_admin_js' %}
+
+    {% block extra_js %}{% endblock %}
+    {% endblock %}
+
+    <a class="skiplink button" href="#main" data-controller="w-skip-link" data-action="w-skip-link#skip">{% trans 'Skip to main content' %}</a>
+
+    <div class="wrapper">
+      {% block furniture %}
+      <template data-wagtail-sidebar-branding-logo>
+        <img src="{% static 'fediverser/images/fediverse-logo.png' %}" alt="Fediverser Network" />
+      </template>
+    </script>
+    {% sidebar_json_script "wagtail-sidebar-props" %}
+    <aside id="wagtail-sidebar" class="sidebar-loading" data-wagtail-sidebar aria-label="{% trans 'Sidebar' %}"></aside>
+
+    <main class="content-wrapper w-overflow-x-hidden" id="main">
+      <div class="content">
+        {# Always show messages div so it can be appended to by JS #}
+        <div class="messages" role="status" data-controller="w-messages" data-action="w-messages:add@document->w-messages#add" data-w-messages-added-class="new" data-w-messages-show-class="appear" data-w-messages-show-delay-value="100">
+          <ul data-w-messages-target="container">
+            {% if messages %}
+            {% for message in messages %}
+            {% message_level_tag message as level_tag %}
+            <li class="{% message_tags message %}">
+              {% if level_tag == "error" %}
+              {# There is no error icon, use warning icon instead #}
+              {% icon name="warning" classname="messages-icon" %}
+              {% elif message.extra_tags == "lock" %}
+              {% icon name="lock" classname="messages-icon" %}
+              {% elif message.extra_tags == "unlock" %}
+              {% icon name="lock-open" classname="messages-icon" %}
+              {% else %}
+              {% icon name=level_tag classname="messages-icon" %}
+              {% endif %}
+              {{ message|safe }}
+            </li>
+            {% endfor %}
+            {% endif %}
+          </ul>
+          <template data-w-messages-target="template" data-type="success">
+            <li class="success">{% icon name="success" classname="messages-icon" %}<span></span></li>
+          </template>
+          <template data-w-messages-target="template" data-type="error">
+            <li class="error">{% icon name="warning" classname="messages-icon" %}<span></span></li>
+          </template>
+          <template data-w-messages-target="template" data-type="warning">
+            <li class="warning">{% icon name="warning" classname="messages-icon" %}<span></span></li>
+          </template>
+        </div>
+
+    {% block content %}
+       {% block header %}
+          {% block slim_header %}
+          {% if breadcrumbs_items %}
+          {% include "wagtailadmin/shared/headers/slim_header.html" %}
+          {% endif %}
+          {% endblock %}
+          {% block main_header %}
+          {% include "wagtailadmin/shared/header.html" with title=page_title subtitle=page_subtitle icon=header_icon only %}
+          {% endblock %}
+       {% endblock %}
+
+    <div class="nice-padding">
+      {% block main_content %}{% endblock %}
+    </div>
+    {% endblock %}
+  </div>
+</main>
+{% endblock %}
+    </div>
+  </body>
+</html>

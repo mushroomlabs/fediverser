@@ -1,0 +1,37 @@
+{% extends "web/generic/listing.tmpl.html" %}
+{% load wagtailadmin_tags %}
+
+{% block listing %}
+<table class="listing listing--inline-actions">
+  <thead>
+    <tr>
+      <th scope="col">Community</th>
+      <th scope="col">Category</th>
+      <th scope="col">Status</th>
+      <th scope="col">Link</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for community in object_list %}
+    <tr>
+      <td class="title">
+        <div class="title-wrapper">
+          <a href="{% url 'fediverser-core:community-detail' name=community.name instance_domain=community.instance.domain %}" target="_blank">
+            {{ community.fqdn }}
+          </a>
+        </div>
+      </td>
+      <td>{{ community.category.name|default:"Not categorized yet" }}</td>
+      <td>{{ community.get_status_display }}</td>
+      <td>
+        <a href="{{ community.url }}" target="_blank" class="button button--icon">
+          <span class="icon-wrapper">
+            <use>{% icon name="link-external" title=community.name %}</use>
+          </span>
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

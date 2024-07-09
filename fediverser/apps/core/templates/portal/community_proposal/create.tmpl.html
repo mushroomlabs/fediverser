@@ -1,0 +1,9 @@
+{% extends "web/generic/form.tmpl.html" %}
+
+{% block before_form %}
+{% include "web/partials/header.tmpl.html" with title=subreddit.name subtitle="Propose Alternative Community" search_url=None search_disable_async=True %}
+{% endblock %}
+
+{% block actions %}
+<input type="submit" value="Submit Proposal" class="button" />
+{% endblock %}

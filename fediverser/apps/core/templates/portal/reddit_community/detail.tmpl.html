@@ -1,0 +1,151 @@
+{% extends "web/generic/base.tmpl.html" %}
+{% load fediverser %}
+
+{% block main_content %}
+<dl>
+  <dt>Subreddit Page</dt>
+  <dd><a href="{{ object.full_reddit_url }}"}} target="_blank">/r/{{ object.name }}</a></dd>
+  {% if object.status %}
+  <dt>Status</dt>
+  <dd>{{ object.get_status_display }}</dd>
+  {% endif %}
+  {% if object.category %}
+  <dt>Category</dt>
+  <dd>{{ object.category.name }}</dd>
+  {% endif %}
+{% if object.has_recommended_alternatives %}
+  <dt>Recommended Alternatives</dt>
+  <dd>
+    <ul>
+      {% for community in object.recommended_communities.all %}
+      <li>
+        <a href="{{ community.url }}">{{ community.fqdn }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </dd>
+  {% endif %}
+  {% if object.has_unresolved_community_requests and not object.locked %}
+  <dt>Community Creation Requests</dt>
+  <dd>
+    Instances that have been requested to create a community to replace /r/{{object.name }}
+    <ul>
+      {% for request in object.unfulfilled_community_requests.all %}
+      <li>
+        <a href="{{ request.instance.url }}">{{ request.instance.domain }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </dd>
+  {% endif %}
+
+</dl>
+
+<hr />
+
+
+{% if not object.locked %}
+{% if object.status is None %}
+<h3>Current Status</h3>
+{% if not user|has_pending_reddit_status_change_request:object %}
+<p>This status of this subreddit is unknown. Help us by checking this subreddit. If all posts are older than 1 year, feel free to mark it as "Abandoned". If it is closed, quarantined or marked as "private", mark it as close.</p>
+
+<form action="{% url 'fediverser-core:subreddit-statusrecommendation-create' name=object.name %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in status_picker_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Status" class="button" />
+    </li>
+  </ul>
+</form>
+{% else %}
+<p>You already provided a status check! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
+{% endif %}
+{% endif %}
+
+
+{% if not object.category %}
+<h3>Category</h3>
+{% if not user|pending_category_proposal:object %}
+<p>This subreddit has not been properly categorized yet. Please indicate the category which closest describe this it:</p>
+<form action="{% url 'fediverser-core:subreddit-categoryrecommendation-create' name=object.name %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in category_picker_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Category" class="button" />
+    </li>
+  </ul>
+</form>
+{% else %}
+<p>You already recommended a category! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
+{% endif %}
+{% endif %}
+
+<h3>Recommended Alternative</h3>
+{% if user|has_pending_community_recommendations:object %}
+<h4>Pending Proposals</h4>
+<ul>
+  {% for proposal in user|pending_community_recommendations:object %}
+  <li>{{ proposal.description }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>Is there any Lemmy community that should be added as an alternative to {{ object.name }}?</p>
+<form action="{% url 'fediverser-core:subreddit-alternativerecommendation-create' name=object.name %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in recommended_alternative_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Alternative" class="button" />
+    </li>
+  </ul>
+</form>
+{% endif %}
+
+{% if object|is_missing_community_recommendations %}
+<h3>Request Community Creation</h3>
+<p>If there is no alternative has been created yet, you may request one to be created at the participating instances. Which instance could be a good home to {{ object.name }}?</p>
+
+<form action="{% url 'fediverser-core:subreddit-communityrequest-create' name=object.name %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in community_request_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Community Request" class="button" />
+    </li>
+  </ul>
+</form>
+{% endif %}
+
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ category_picker_form.media.js }}
+{% endblock %}
+
+
+{% block extra_css %}
+{{ block.super }}
+{{ category_picker_form.media.css }}
+{% endblock %}

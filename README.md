@@ -46,7 +46,7 @@ Before you begin, ensure you have met the following requirements:
 
    - `FEDIVERSER_REDDIT_CLIENT_ID`: Your Reddit API client ID.
    - `FEDIVERSER_REDDIT_CLIENT_SECRET`: Your Reddit API client secret.
-   - `FEDIVERSER_LEMMY_MIRROR_INSTANCE`: The domain of your fediverse instance (e.g., lemmy.example.com).
+   - `FEDIVERSER_CONNECTED_LEMMY_INSTANCE`: The domain of your fediverse instance (e.g., lemmy.example.com).
 
 ## Usage
 

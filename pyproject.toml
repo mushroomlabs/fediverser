@@ -29,7 +29,7 @@ authors = ["Raphael Lullis <raphael@mushroomlabs.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<=3.12"
+python = ">=3.10,<4"
 praw = "^7.7.1"
 pythorhead = "^0.25.2"
 requests = "^2"
@@ -55,6 +55,11 @@ pysass = "^0.1.0"
 pyjwt = "^2.8.0"
 django-rest-framework = "^0.1.0"
 pyotp = "^2.9.0"
+cloudscraper = "^1.2.71"
+wagtail = "^6.1.2"
+wagtail-autocomplete = "^0.11.0"
+django-filter = "^24.2"
+django-tree-queries = "^0.19.0"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.14.0"
