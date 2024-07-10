@@ -1,4 +1,4 @@
-{% extends "web/generic/base.tmpl.html" %}
+{% extends "portal/generic/base.tmpl.html" %}
 {% load i18n %}
 
 {% block content %}
@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block main_header %}
-{% include "web/partials/header.tmpl.html" with title=page_title subtitle=page_subtitle action_url=header_action_url action_text=header_action_label icon=header_icon only %}
+{% include "portal/partials/header.tmpl.html" with title=page_title subtitle=page_subtitle action_url=header_action_url action_text=header_action_label icon=header_icon only %}
 {% endblock %}
 {% endblock %}
 

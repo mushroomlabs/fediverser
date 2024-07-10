@@ -118,6 +118,14 @@ class Community(models.Model):
     def __str__(self):
         return self.fqdn
 
+    @classmethod
+    def get_metadata(cls, url):
+        scraper = make_ap_client()
+        response = scraper.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
     class Meta:
         unique_together = ("instance", "name")
         verbose_name_plural = "Communities"

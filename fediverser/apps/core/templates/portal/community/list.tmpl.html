@@ -1,4 +1,4 @@
-{% extends "web/generic/listing.tmpl.html" %}
+{% extends "portal/generic/listing.tmpl.html" %}
 {% load wagtailadmin_tags %}
 
 {% block listing %}
@@ -7,7 +7,6 @@
     <tr>
       <th scope="col">Community</th>
       <th scope="col">Category</th>
-      <th scope="col">Status</th>
       <th scope="col">Link</th>
     </tr>
   </thead>
@@ -22,7 +21,6 @@
         </div>
       </td>
       <td>{{ community.category.name|default:"Not categorized yet" }}</td>
-      <td>{{ community.get_status_display }}</td>
       <td>
         <a href="{{ community.url }}" target="_blank" class="button button--icon">
           <span class="icon-wrapper">

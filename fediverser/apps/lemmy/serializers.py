@@ -29,7 +29,6 @@ class LemmyLoginSerializer(serializers.Serializer):
         except LocalUserProxy.DoesNotExist:
             raise serializers.ValidationError("incorrect_login")
         except AssertionError as exc:
-            breakpoint()
             raise serializers.ValidationError(str(exc))
         return attrs
 

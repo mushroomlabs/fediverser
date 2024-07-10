@@ -9,7 +9,7 @@ from django.dispatch import receiver
 
 from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 
-from .models.account import UserAccount
+from .models.accounts import UserAccount
 from .models.mirroring import LemmyMirroredPost
 from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
 from .tasks import post_mirror_disclosure, subscribe_to_community

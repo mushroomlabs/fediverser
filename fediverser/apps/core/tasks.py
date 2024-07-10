@@ -11,7 +11,7 @@ from fediverser.apps.lemmy.services import LemmyClientRateLimited, LocalUserProx
 
 from .choices import AutomaticSubmissionPolicies
 from .models.activitypub import Community
-from .models.ambassadors import CommunityInvite, CommunityInviteTemplate
+from .models.invites import CommunityInvite, CommunityInviteTemplate
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost
 from .models.reddit import (
     RedditAccount,

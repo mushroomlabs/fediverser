@@ -13,6 +13,7 @@ from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 from model_utils.models import StatusModel, TimeStampedModel
 from praw import Reddit
+from prawcore.exceptions import Forbidden, NotFound, UnavailableForLegalReasons
 from pythorhead.types import LanguageType
 from taggit.managers import TaggableManager
 from wagtail.admin.panels import FieldPanel
@@ -151,9 +152,9 @@ class RedditCommunity(models.Model):
             praw_subreddit = client.subreddit(self.name)
             data = praw_subreddit._fetch_data()
             self.metadata = data.get("data")
-        except praw.exceptions.UnavailableForLegalReasons:
+        except UnavailableForLegalReasons:
             self.metadata = None
-        except (praw.exceptions.Forbidden, praw.exceptions.NotFound):
+        except (Forbidden, NotFound):
             self.hidden = True
             self.metadata = None
         self.save()

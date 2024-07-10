@@ -1,4 +1,4 @@
-{% extends "web/generic/listing.tmpl.html" %}
+{% extends "portal/generic/listing.tmpl.html" %}
 {% load wagtailadmin_tags %}
 
 {% block listing %}
@@ -8,7 +8,6 @@
       <th scope="col">Domain</th>
       <th scope="col">Software</th>
       <th scope="col">Category</th>
-      <th scope="col">Status</th>
       <th scope="col">Link</th>
     </tr>
   </thead>
@@ -24,7 +23,6 @@
       </td>
       <td>{{ instance.get_software_display }}</td>
       <td>{{ instance.category.name|default:"Not categorized yet" }}</td>
-      <td>{{ instance.get_status_display }}</td>
       <td>
         <a href="{{ instance.url }}" target="_blank" class="button button--icon">
           <span class="icon-wrapper">

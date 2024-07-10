@@ -47,6 +47,7 @@ THIRD_PARTY_APPS = (
     "tree_queries",
     "wagtail.contrib.forms",
     "wagtail.contrib.routable_page",
+    "wagtail.contrib.styleguide",
     "wagtail.sites",
     "wagtail.documents",
     "wagtail.snippets",

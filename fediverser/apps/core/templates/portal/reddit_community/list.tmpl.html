@@ -1,10 +1,5 @@
-{% extends "web/generic/listing.tmpl.html" %}
-{% load i18n account wagtailadmin_tags web fediverser %}
-
-{% block main_header %}
-{% include "web/partials/header.tmpl.html" with title="Fediverser Network" subtitle="Subreddits" search_url="home" search_disable_async=True %}
-{% endblock %}
-
+{% extends "portal/generic/listing.tmpl.html" %}
+{% load i18n account wagtailadmin_tags fediverser %}
 
 {% block listing %}
 <table class="listing listing--inline-actions">
@@ -12,14 +7,12 @@
     <tr>
       <th scope="col">Name</th>
       <th scope="col">Category</th>
-      <th scope="col">Status</th>
       <th scope="col">Recommended Alternatives</th>
       {% if not user.is_staff %}
       <th scope="col">Subscriber?</th>
       {% endif %}
       {% if user.is_staff %}
       <th scope="col">Locked</th>
-
       {% endif %}
     </tr>
   </thead>
@@ -50,26 +43,9 @@
         {% endif %}
       </td>
       <td>
-        {% if subreddit.status %}
-        {{ subreddit.get_status_display }}
-        {% else %}
-        <form action="{% url 'fediverser-core:subreddit-statusrecommendation-create' name=subreddit.name %}" method="POST" name="bulk_status_picker" novalidate>
-          {% csrf_token %}
-          <ul class="fields">
-            {% for field in status_picker_form.visible_fields %}
-            <li>
-              {% include "wagtailadmin/shared/field.html" %}
-            </li>
-            {% endfor %}
-          </ul>
-        </form>
-
-        {% endif %}
-      </td>
-      <td>
         <ul>
-          {% for community in subreddit.recommended_communities.all %}
-          <li><a href="{{ community.url }}" target="_blank">!{{ community.fqdn }}</a></li>
+          {% for recommendation in subreddit.recommendations.all %}
+          <li><a href="{{ recommendation.community.url }}" target="_blank">!{{ recommendation.community.fqdn }}</a></li>
           {% endfor %}
           {% for community in subreddit.candidate_communities %}
           <li><a href="{{ community.url }}" target="_blank">!{{ community.fqdn }} (Pending Review)</a></li>

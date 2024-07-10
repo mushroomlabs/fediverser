@@ -1,4 +1,4 @@
-{% extends "web/generic/base.tmpl.html" %}
+{% extends "portal/generic/base.tmpl.html" %}
 {% load fediverser %}
 
 {% block main_content %}
@@ -17,9 +17,9 @@
   <dt>Recommended Alternatives</dt>
   <dd>
     <ul>
-      {% for community in object.recommended_communities.all %}
+      {% for recommendation in object.recommendations.all %}
       <li>
-        <a href="{{ community.url }}">{{ community.fqdn }}</a>
+        <a href="{{ recommendation.community.url }}">{{ recommendation.community.fqdn }}</a>
       </li>
       {% endfor %}
     </ul>

@@ -4,10 +4,10 @@ from django.db.models import Count
 from fediverser.apps.lemmy.services import LemmyClientRateLimited
 
 from . import tasks
-from .models.account import UserAccount
+from .models.accounts import UserAccount
 from .models.activitypub import Community, Instance
-from .models.ambassadors import CommunityInviteTemplate
-from .models.mapping import Category
+from .models.invites import CommunityInviteTemplate
+from .models.mapping import Category, ChangeRequest
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
 from .models.reddit import (
     RedditAccount,
@@ -37,6 +37,28 @@ class UserAccountAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ChangeRequest)
+class ChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ("description", "requester", "status")
+    list_filter = ("status",)
+
+    actions = ("accept_changes", "reject_changes")
+
+    @admin.action(description="Accept requested changes")
+    def accept_changes(self, request, queryset):
+        for change_request in queryset.select_subclasses():
+            change_request.accept()
+
+    @admin.action(description="Reject requested changes")
+    def reject_changes(self, request, queryset):
+        for change_request in queryset.select_subclasses():
+            change_request.reject()
+
+    def get_queryset(self, *args, **kw):
+        qs = super().get_queryset(*args, **kw)
+        return qs.select_subclasses()
 
 
 @admin.register(Category)
@@ -79,14 +101,27 @@ class CommunityAdmin(admin.ModelAdmin):
 class RedditCommunityAdmin(admin.ModelAdmin):
     change_form_template = "admin/redditcommunity_change_form.html"
 
-    list_display = ("name", "last_synced_at")
+    list_display = (
+        "name",
+        "category",
+        "over18",
+        "advertiser_category",
+        "locked",
+        "reported_subscribers",
+        "last_synced_at",
+    )
     search_fields = ("name",)
-    actions = ("fetch_new_posts",)
+    actions = ("get_metadata", "fetch_new_posts")
 
     @admin.action(description="Fetch new submissions")
     def fetch_new_posts(self, request, queryset):
         for subreddit_name in queryset.values_list("name", flat=True):
             tasks.fetch_new_posts.delay(subreddit_name=subreddit_name)
+
+    @admin.action(description="Fetch Metadata")
+    def get_metadata(self, request, queryset):
+        for subreddit in queryset:
+            subreddit.get_metadata()
 
 
 @admin.register(RedditAccount)

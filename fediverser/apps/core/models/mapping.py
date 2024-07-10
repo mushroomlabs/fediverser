@@ -5,25 +5,23 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from model_utils import Choices
 from model_utils.managers import InheritanceManager, QueryManager
-from model_utils.models import StatusModel, TimeStampedModel
-from wagtailautocomplete.edit_handlers import AutocompletePanel
+from model_utils.models import StatusModel
 
 from .activitypub import Community, Instance
-from .common import COMMUNITY_STATUSES, INSTANCE_STATUSES, Category
+from .common import Category
 from .reddit import RedditCommunity
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class RedditAlternativeRecommendation(TimeStampedModel):
+class RedditToCommunityRecommendation(models.Model):
     subreddit = models.ForeignKey(
         RedditCommunity, related_name="recommendations", on_delete=models.CASCADE
     )
     community = models.ForeignKey(
         Community, related_name="recommendations", on_delete=models.CASCADE
     )
-    panels = [AutocompletePanel("subreddit"), AutocompletePanel("community")]
 
     class Meta:
         unique_together = ("subreddit", "community")
@@ -80,37 +78,7 @@ class RecommendCommunity(ChangeRequest):
         return f"Recommend {self.community.fqdn} as alternative to {self.subreddit}"
 
     def apply(self):
-        self.subreddit.recommended_communities.add(self.community)
-
-
-class SetRedditCommunityStatus(ChangeRequest):
-    subreddit = models.ForeignKey(
-        RedditCommunity, related_name="status_change_requests", on_delete=models.CASCADE
-    )
-    community_status = models.CharField(max_length=20, choices=COMMUNITY_STATUSES)
-
-    @property
-    def description(self):
-        return f"Mark {self.subreddit.name} as {self.get_community_status_display()}"
-
-    def apply(self):
-        self.subreddit.status = self.community_status
-        self.subreddit.save()
-
-
-class SetCommunityStatus(ChangeRequest):
-    community = models.ForeignKey(
-        Community, related_name="status_change_requests", on_delete=models.CASCADE
-    )
-    community_status = models.CharField(max_length=20, choices=COMMUNITY_STATUSES)
-
-    @property
-    def description(self):
-        return f"Mark {self.community.fqdn} as {self.get_community_status_display()}"
-
-    def apply(self):
-        self.community.status = self.community_status
-        self.community.save()
+        self.subreddit.recommendations.create(community=self.community)
 
 
 class SetCommunityCategory(ChangeRequest):
@@ -126,21 +94,6 @@ class SetCommunityCategory(ChangeRequest):
     def apply(self):
         self.community.category = self.category
         self.community.save()
-
-
-class SetInstanceStatus(ChangeRequest):
-    instance = models.ForeignKey(
-        Instance, related_name="status_change_requests", on_delete=models.CASCADE
-    )
-    server_status = models.CharField(max_length=20, choices=INSTANCE_STATUSES)
-
-    @property
-    def description(self):
-        return f"Mark {self.instance.domain} as {self.get_server_status_display()}"
-
-    def apply(self):
-        self.instance.status = self.server_status
-        self.instance.save()
 
 
 class SetInstanceCategory(ChangeRequest):

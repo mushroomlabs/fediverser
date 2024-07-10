@@ -1,4 +1,4 @@
-{% extends "web/generic/base.tmpl.html" %}
+{% extends "portal/generic/base.tmpl.html" %}
 {% load fediverser %}
 
 {% block main_content %}
@@ -15,29 +15,6 @@
   {% endif %}
 </dl>
 <hr />
-
-{% if object.status is None %}
-<h3>Current Status</h3>
-{% if not user|has_pending_community_status_change_request:object %}
-<p>This status of this community is unknown. You can help us by checking if the link above is still working. It not, please mark it as closed. If posts or comments in it are all older than 1 month, feel free to mark it as "Abandoned".
-</p>
-<form action="{% url 'fediverser:community-statusrecommendation-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
-  {% csrf_token %}
-  <ul class="fields">
-    {% for field in status_picker_form.visible_fields %}
-    <li>
-      {% include "wagtailadmin/shared/field.html" %}
-    </li>
-    {% endfor %}
-    <li>
-      <input type="submit" value="Submit Status" class="button" />
-    </li>
-  </ul>
-</form>
-{% else %}
-<p>You already provided a status check! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
-{% endif %}
-{% endif %}
 
 {% if not object.category %}
 <h3>Category</h3>
@@ -61,16 +38,33 @@
 {% endif %}
 {% endif %}
 
+
+<h2>Community Ambassadors</h2>
+<p>Interested in helping {{ object.fqdn }} grow can become a <strong>Community Ambassador</strong>? You will be able to:</p>
+
+<ul>
+  <li>Create curated sources of content which can be easily shared with the community</li>
+  <li>Reach out to users on Reddit that might be interested in migrating to the Fediverse</li>
+  <li>Define policies for content bridging between the Fediverse and Reddit</li>
+</ul>
+{% if user|is_ambassador:object %}
+You are enrolled as an ambassador for {{ object.fqdn }}.
+{% elif user|has_pending_ambassador_application:object %}
+<p>Your application has been received and will be reviewed by an admin.</p>
+{% else %}
+<form action="{% url 'fediverser-core:community-ambassador-application-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <input type="submit" value="Submit Application" class="button" />
+</form>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
-{{ status_picker_form.media.js }}
 {{ category_picker_form.media.js }}
 {% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
-{{ status_picker_form.media.css }}
 {{ category_picker_form.media.css }}
 {% endblock %}

@@ -4,10 +4,9 @@
 {% block main_content %}
 {% if not user.is_authenticated %}
 <h1 class="w-header__title">  Welcome to {% site_name %}</h1>
-{% lemmy_instance as lemmy %}
-
 <h2>One-click migration tool from Reddit to the Fediverse.</h2>
 
+{% lemmy_instance as lemmy %}
 <p>
   <a href="{% url 'fediverser-core:reddit-connection-setup' %}">Sign-up</a>
   using your Reddit account, get started on

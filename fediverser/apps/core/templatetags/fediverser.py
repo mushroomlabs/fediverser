@@ -38,8 +38,39 @@ def sidebar_json_script(context, element_id):
         ),
     ]
 
-    account_menu = logged_user_menu if request.user.is_authenticated else []
-    main_menu = anonymous_user_menu if not request.user.is_authenticated else []
+    account_menu = logged_user_menu if request.user.is_authenticated else anonymous_user_menu
+    main_menu = [
+        sidebar.LinkMenuItem(
+            "instance-list",
+            _("Instances"),
+            reverse("fediverser-core:instance-list"),
+            icon_name="site",
+        ),
+        sidebar.LinkMenuItem(
+            "community-list",
+            _("Communities"),
+            reverse("fediverser-core:community-list"),
+            icon_name="group",
+        ),
+        sidebar.LinkMenuItem(
+            "subreddit-list",
+            _("Subreddits"),
+            reverse("fediverser-core:subreddit-list"),
+            icon_name="group",
+        ),
+    ]
+
+    if request.user.is_authenticated:
+        main_menu.extend(
+            [
+                sidebar.LinkMenuItem(
+                    "activity",
+                    _("Activity"),
+                    reverse("fediverser-core:activity-list"),
+                    icon_name="history",
+                )
+            ]
+        )
 
     modules = [
         FediverserBrandingModule(),
@@ -74,7 +105,7 @@ def is_missing_community_recommendations(subreddit):
         status=ChangeRequest.STATUS.requested
     ).exists()
 
-    accepted_recommendations = subreddit.recommended_communities.exists()
+    accepted_recommendations = subreddit.recommendations.exists()
 
     return not pending_recommendations and not accepted_recommendations
 
@@ -141,8 +172,21 @@ def has_pending_community_status_change_request(user, community):
 
 @register.filter
 def is_subscriber(user, subreddit_name):
-    subreddit = RedditCommunity.objects.get(name__iexact=subreddit_name)
-    return user in subreddit.subscribers.all()
+    return RedditCommunity.objects.filter(
+        name__iexact=subreddit_name, redditaccount__portal_account__user=user
+    ).exists()
+
+
+@register.filter
+def is_ambassador(user, community):
+    return user.account.representing_communities.filter(community=community).exists()
+
+
+@register.filter
+def has_pending_ambassador_application(user, community):
+    return community.ambassador_applications.filter(
+        requester=user, status=ChangeRequest.STATUS.requested
+    ).exists()
 
 
 @register.simple_tag
