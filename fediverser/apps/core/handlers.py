@@ -10,9 +10,10 @@ from django.dispatch import receiver
 from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 
 from .models.accounts import UserAccount
+from .models.feeds import Feed
 from .models.mirroring import LemmyMirroredPost
 from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
-from .tasks import post_mirror_disclosure, subscribe_to_community
+from .tasks import fetch_feed, post_mirror_disclosure, subscribe_to_community
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -121,3 +122,10 @@ def on_subreddit_added_subscribe_to_corresponding_community(sender, **kw):
                 continue
             for recommendation in subreddit.recommendations.all():
                 subscribe_to_community.delay(lemmy_user.id, recommendation.community.id)
+
+
+@receiver(post_save, sender=Feed)
+def on_feed_created_fetch_entries(sender, **kw):
+    if kw["created"]:
+        feed = kw["instance"]
+        fetch_feed.delay(feed_url=feed.url)

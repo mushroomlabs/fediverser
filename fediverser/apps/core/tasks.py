@@ -11,6 +11,7 @@ from fediverser.apps.lemmy.services import LemmyClientRateLimited, LocalUserProx
 
 from .choices import AutomaticSubmissionPolicies
 from .models.activitypub import Community
+from .models.feeds import Entry, Feed
 from .models.invites import CommunityInvite, CommunityInviteTemplate
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost
 from .models.reddit import (
@@ -172,3 +173,22 @@ def push_new_submissions_to_lemmy():
                 reddit_submission.save()
             except Exception:
                 logger.exception(f"Failed to post {reddit_submission.id}")
+
+
+@shared_task
+def fetch_feed(feed_url):
+    feed = Feed.make(feed_url)
+    feed.fetch()
+
+
+@shared_task
+def fetch_feeds():
+    for feed in Feed.objects.all():
+        feed.fetch()
+
+
+@shared_task
+def clear_old_feed_entries():
+    now = timezone.now()
+    cutoff = now - Entry.MAX_AGE
+    Entry.objects.filter(modified__lte=cutoff).delete()

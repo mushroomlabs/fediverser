@@ -1,11 +1,13 @@
 from django import template
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import json_script
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.ui import sidebar
 from wagtail.telepath import JSContext, adapter
 
+from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
 from fediverser.apps.core.models.reddit import RedditCommunity
 from fediverser.apps.lemmy.services import InstanceProxy
@@ -187,6 +189,14 @@ def has_pending_ambassador_application(user, community):
     return community.ambassador_applications.filter(
         requester=user, status=ChangeRequest.STATUS.requested
     ).exists()
+
+
+@register.filter
+def latest_feed_entries(community):
+    now = timezone.now()
+    cutoff = now - Entry.MAX_AGE
+    entries = Entry.objects.filter(feed__communities__community=community, modified__gte=cutoff)
+    return entries.select_related("feed").order_by("-modified")
 
 
 @register.simple_tag

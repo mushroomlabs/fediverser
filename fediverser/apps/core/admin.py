@@ -6,6 +6,7 @@ from fediverser.apps.lemmy.services import LemmyClientRateLimited
 from . import tasks
 from .models.accounts import UserAccount
 from .models.activitypub import Community, Instance
+from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
 from .models.mapping import Category, ChangeRequest
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
@@ -37,6 +38,35 @@ class UserAccountAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Feed)
+class FeedAdmin(admin.ModelAdmin):
+    date_hierarchy = "last_fetched"
+    list_display = ("url", "title", "last_fetched")
+
+    actions = ("fetch_feeds",)
+
+    @admin.action(description="Fetch entries for selected feeds")
+    def fetch_feeds(self, request, queryset):
+        for feed in queryset:
+            try:
+                feed.fetch(force=True)
+                messages.success(request, f"Feed {feed.url} has been updated")
+            except Exception as exc:
+                messages.error(request, f"Failed to fetch {feed.url}: {exc}")
+
+
+@admin.register(Entry)
+class FeedEntryAdmin(admin.ModelAdmin):
+    date_hierarchy = "created"
+    list_display = ("link", "title", "feed", "created", "modified")
+    list_filter = ("feed",)
+
+
+@admin.register(CommunityFeed)
+class CommunityFeedAdmin(admin.ModelAdmin):
+    list_display = ("feed", "community")
 
 
 @admin.register(ChangeRequest)
@@ -94,7 +124,9 @@ class CommunityAdmin(admin.ModelAdmin):
     list_select_related = ("instance", "category")
     search_fields = ("name", "instance__domain")
     autocomplete_fields = ("instance",)
-    readonly_fields = ("instance", "name")
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(RedditCommunity)

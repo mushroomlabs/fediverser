@@ -3,7 +3,7 @@ from allauth.socialaccount.providers.reddit.views import RedditAdapter
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import F
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
@@ -72,7 +72,12 @@ class CommunityDetailView(DetailView):
     def get_context_data(self, *args, **kw):
         context = super().get_context_data(*args, **kw)
 
-        context.update({"category_picker_form": forms.CommunityCategoryRecommendationForm()})
+        context.update(
+            {
+                "category_picker_form": forms.CommunityCategoryRecommendationForm(),
+                "community_feed_form": forms.CommunityFeedForm(),
+            }
+        )
         return context
 
 
@@ -303,6 +308,30 @@ class CommunityRequestCreateView(CreateView):
             name__iexact=self.kwargs["name"]
         )
         return super().form_valid(form)
+
+
+class CommunityFeedCreateView(CreateView):
+    model = models.CommunityFeed
+    form_class = forms.CommunityFeedForm
+
+    def get_success_url(self, *args, **kw):
+        return reverse(
+            "fediverser-core:community-detail",
+            kwargs=dict(name=self.kwargs["name"], instance_domain=self.kwargs["instance_domain"]),
+        )
+
+    def get_community(self):
+        return get_object_or_404(
+            models.Community,
+            name=self.kwargs["name"],
+            instance__domain=self.kwargs["instance_domain"],
+        )
+
+    def form_valid(self, form):
+        form.instance.community = self.get_community()
+        community_feed = form.save()
+        self.request.user.account.community_feeds.add(community_feed)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class SubredditViewSet(SnippetViewSet):

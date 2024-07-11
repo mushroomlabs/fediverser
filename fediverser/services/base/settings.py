@@ -30,6 +30,7 @@ DJANGO_APPS = (
     "django.contrib.sessions",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
+    "django.contrib.humanize",
 )
 
 THIRD_PARTY_APPS = (

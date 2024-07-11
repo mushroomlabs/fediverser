@@ -6,11 +6,18 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from . import models
-from .models.accounts import CommunityAmbassadorApplication
 from .models.activitypub import AP_SERVER_SOFTWARE
+from .models.feeds import CommunityFeed, Feed
 from .models.reddit import make_reddit_client
 
 logger = logging.getLogger(__name__)
+
+
+class ContentFeedField(forms.Field):
+    def to_python(self, value):
+        if not value:
+            return None
+        return Feed.make(value)
 
 
 class CategoryPickerForm(forms.Form):
@@ -191,3 +198,11 @@ class InstanceCategoryRecommendationForm(forms.ModelForm):
     class Meta:
         model = models.SetInstanceCategory
         fields = ("category",)
+
+
+class CommunityFeedForm(forms.ModelForm):
+    feed = ContentFeedField()
+
+    class Meta:
+        model = CommunityFeed
+        fields = ("feed",)

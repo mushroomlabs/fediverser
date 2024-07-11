@@ -1,6 +1,7 @@
 {% extends "portal/generic/base.tmpl.html" %}
-{% load fediverser %}
+{% load fediverser humanize %}
 
+{% lemmy_instance %}
 {% block main_content %}
 <dl>
   <dt>Community Page</dt>
@@ -57,6 +58,61 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
   <input type="submit" value="Submit Application" class="button" />
 </form>
 {% endif %}
+
+<h2>Content Feeds</h2>
+<p>
+  Community Ambassadors can select and curate a list of content feeds
+  from around the web. The idea is to help find out the content that
+  is relevant to the communities on the Fediverse and stimulate user
+  participation. Take a look at the entries below, share them directly
+  on {{ object.fqdn }} with one click.
+</p>
+
+{% if object.feeds.exists %}
+
+<p>Here are some of the recent entries that might be interesting:</p>
+<table class="listing listing--inline-actions">
+  <thead>
+    <tr>
+    <th scope="col">Title</th>
+    <th scope="col">Source</th>
+    <th scope="col">Published On</th>
+    <th scope="col">Shared on Community</th>
+  </thead>
+  <tbody>
+    {% for entry in object|latest_feed_entries %}
+    <tr>
+      <td><a href="{{ entry.link }}" target="_blank">{{ entry.title }}</a></td>
+      <td>{{ entry.feed.url }}</td>
+      <td>{{ entry.modified|naturaltime }}</td>
+      <td></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>The Community Ambassadors for {{ object.fqdn }} have not defined any RSS feed that might be relevant</p>
+{% endif %}
+
+
+{% if user|is_ambassador:object %}
+<p>As a Community Ambassador, you can add new feeds. Please add the URL for RSS or Atom feed</p>
+<form action="{% url 'fediverser-core:community-contentfeed-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in community_feed_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Add Feed" class="button" />
+    </li>
+  </ul>
+</form>
+{% endif %}
+
+
 {% endblock %}
 
 {% block extra_js %}

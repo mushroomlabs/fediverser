@@ -99,6 +99,9 @@ services:
   celery:
     <<: *fediverser-dev-service
 
+  celerybeat:
+    <<: *fediverser-dev-service
+
   init_migrate_db:
     <<: *fediverser-dev-service
     restart: on-failure

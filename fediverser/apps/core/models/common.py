@@ -44,7 +44,7 @@ class Category(TreeNode):
 
     @property
     def full_name(self):
-        return "::".join([str(n.name) for n in self.ancestors(include_self=True)])
+        return " : ".join([str(n.name) for n in self.ancestors(include_self=True)])
 
     def __str__(self):
         return self.name

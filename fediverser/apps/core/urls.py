@@ -46,6 +46,11 @@ urlpatterns = [
         views.CommunityAmbassadorApplicationCreateView.as_view(),
         name="community-ambassador-application-create",
     ),
+    path(
+        "communities/<str:name>@<str:instance_domain>/feeds/create",
+        views.CommunityFeedCreateView.as_view(),
+        name="community-contentfeed-create",
+    ),
     path("subreddits/create", views.SubredditCreateView.as_view(), name="subreddit-create"),
     path("subreddits/<str:name>", views.SubredditDetailView.as_view(), name="subreddit-detail"),
     path("subreddits/<str:name>/lock", views.lock_subreddit, name="subreddit-lock"),

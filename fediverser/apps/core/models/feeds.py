@@ -2,7 +2,9 @@ import datetime
 import logging
 
 import feedparser
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import models
+from django.template.defaultfilters import slugify
 from django.utils import timezone
 from model_utils.managers import QueryManager
 from model_utils.models import TimeStampedModel
@@ -10,7 +12,7 @@ from taggit.managers import TaggableManager
 
 from .activitypub import Community
 
-EPOCH = datetime.datetime.fromtimestamp(0)
+EPOCH = timezone.make_aware(datetime.datetime.fromtimestamp(0))
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +21,9 @@ def parsed_datetime(time_tuple):
     return timezone.make_aware(datetime.datetime(*time_tuple[:6]))
 
 
-class AbstractFeedAuthorData(models.Model):
-    author_name = models.TextField(null=True, blank=True)
-    author_email = models.EmailField(null=True, blank=True)
-    author_link = models.URLField(null=True, blank=True)
+class Feed(TimeStampedModel):
+    FETCH_INTERVAL = datetime.timedelta(seconds=15 * 60)
 
-    class Meta:
-        abstract = True
-
-
-class Feed(TimeStampedModel, AbstractFeedAuthorData):
     url = models.URLField(unique=True)
     title = models.TextField(null=True)
     subtitle = models.TextField(null=True, blank=True)
@@ -45,35 +40,33 @@ class Feed(TimeStampedModel, AbstractFeedAuthorData):
 
         return f"{self.title} ({self.url})"
 
-    def fetch(self):
-        result = feedparser.parse(self.url)
-        last_checked_time_tuple = (self.last_checked or EPOCH).timetuple()
-        for entry in result.entries:
-            if entry.get("updated_parsed") > last_checked_time_tuple:
-                author_detail = entry.get("author_detail", {})
-                try:
-                    content = entry.content[0].value
-                except (AttributeError, IndexError):
-                    content = None
+    def fetch(self, force=False):
+        logger.info(f"Feed {self.url} requested")
 
-                feed_link, _ = Entry.objects.get_or_create(
-                    feed=self,
-                    url=entry["url"],
-                    defaults={
-                        "title": entry.title,
-                        "summary": entry.summary,
-                        "content": content,
-                        "created": parsed_datetime(entry.published_parsed),
-                        "modified": parsed_datetime(entry.updated_parsed),
-                        "author_name": author_detail.get("name"),
-                        "author_link": author_detail.get("link"),
-                        "author_email": author_detail.get("email"),
-                        "guid": entry.get("id") or entry.get("post-id"),
-                    },
-                )
-            else:
-                logger.info(f"Skipping {entry.id}")
-        self.last_checked = timezone.now()
+        last_checked = self.last_fetched or EPOCH
+        now = timezone.now()
+        if not force and (now - last_checked < Feed.FETCH_INTERVAL):
+            time_ago = naturaltime(last_checked)
+            logger.info(f"Skipping {self.url} because it was fetched only {time_ago}")
+            return
+
+        result = feedparser.parse(self.url)
+        for entry in result.entries:
+            if not entry.get("link"):
+                continue
+
+            entry_age = now - parsed_datetime(entry.updated_parsed)
+            try:
+                assert entry_age < Entry.MAX_AGE, "too old"
+                assert parsed_datetime(entry.updated_parsed) > last_checked, "already checked"
+                Entry.make(entry=entry, feed=self)
+            except AssertionError as exc:
+                if force:
+                    Entry.make(entry=entry, feed=self)
+                else:
+                    logger.info(f"Skipping entry {entry.link}: {exc}")
+
+        self.last_fetched = now
         self.save()
 
     @classmethod
@@ -86,26 +79,54 @@ class Feed(TimeStampedModel, AbstractFeedAuthorData):
                 url=url,
                 title=result.feed.title,
                 subtitle=getattr(result.feed, "subtitle", None),
-                language=getattr(result.feed, "language", None),
-                etag=result.etag,
+                etag=getattr(result, "etag", None),
             )
         return feed
 
 
-class Entry(TimeStampedModel, AbstractFeedAuthorData):
+class Entry(TimeStampedModel):
+    MAX_AGE = datetime.timedelta(days=7)
+
     feed = models.ForeignKey(Feed, on_delete=models.PROTECT)
-    url = models.URLField(unique=True)
+    link = models.URLField(unique=True)
     title = models.TextField(null=True, blank=True)
     guid = models.CharField(max_length=500, null=True, blank=True, db_index=True)
     summary = models.TextField(null=True, blank=True)
-    content = models.TextField(null=True, blank=True)
-    copyright = models.TextField(null=True, blank=True)
     tags = TaggableManager()
+
+    def __str__(self):
+        return self.link
+
+    @classmethod
+    def make(cls, entry, feed):
+        link = entry.get("link")
+        tag_list = entry.get("tags", [])
+        tags = [t.get("term") if isinstance(t, dict) else str(t) for t in tag_list]
+        obj, _ = cls.objects.update_or_create(
+            feed=feed,
+            link=link,
+            defaults={
+                "title": entry.title,
+                "summary": entry.summary,
+                "created": parsed_datetime(entry.published_parsed),
+                "modified": parsed_datetime(entry.updated_parsed),
+                "guid": entry.get("id") or entry.get("post-id"),
+                "tags": ", ".join([slugify(tag) for tag in tags]),
+            },
+        )
+
+        return obj
+
+    class Meta:
+        verbose_name_plural = "Feed Entries"
 
 
 class CommunityFeed(models.Model):
     community = models.ForeignKey(Community, related_name="feeds", on_delete=models.CASCADE)
     feed = models.ForeignKey(Feed, related_name="communities", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.feed.url} (feed for {self.community.fqdn})"
 
     class Meta:
         unique_together = ("community", "feed")
