@@ -1,5 +1,5 @@
 {% extends "portal/generic/base.tmpl.html" %}
-{% load fediverser humanize %}
+{% load fediverser humanize wagtailadmin_tags %}
 
 {% lemmy_instance %}
 {% block main_content %}
@@ -71,6 +71,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
 </form>
 {% endif %}
 
+<hr />
 <h2>Content Feeds</h2>
 <p>
   Community Ambassadors can select and curate a list of content feeds
@@ -80,9 +81,23 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
   on {{ object.fqdn }} with one click.
 </p>
 
-{% if object.feeds.exists %}
+{% if user|is_ambassador:object %}
+<p>As a Community Ambassador, you can add new feeds. Please add the URL for RSS or Atom feed</p>
+<form action="{% url 'fediverser-core:community-contentfeed-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  {% formattedfield field=community_feed_form.feed %}
+  <input type="submit" value="Add Feed" class="button" />
+</form>
+{% endif %}
 
-<p>Here are some of the recent entries that might be interesting:</p>
+<hr />
+
+{% with object|latest_feed_entries as feed_entries %}
+{% with object|submissions_from_related_subreddits as reddit_submissions %}
+{% if feed_entries.exists or reddit_submissions.exists %}
+
+<h2>Content Suggestions</h2>
+<p>Here are some of the recent entries that might be interesting to post to {{ object.fqdn }}</p>
 <table class="listing listing--inline-actions">
   <thead>
     <tr>
@@ -92,7 +107,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
     <th scope="col">Shared on Community</th>
   </thead>
   <tbody>
-    {% for submission in object|submissions_from_related_subreddits %}
+    {% for submission in reddit_submissions %}
     <tr>
       <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
       <td>{{ submission.subreddit.name }}</td>
@@ -100,7 +115,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
       <td></td>
     </tr>
     {% endfor %}
-    {% for entry in object|latest_feed_entries %}
+    {% for entry in feed_entries %}
     <tr>
       <td><a href="{{ entry.link }}" target="_blank">{{ entry.title }}</a></td>
       <td>{{ entry.feed.url }}</td>
@@ -113,25 +128,8 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
 {% else %}
 <p>The Community Ambassadors for {{ object.fqdn }} have not defined any RSS feed that might be relevant</p>
 {% endif %}
-
-
-{% if user|is_ambassador:object %}
-<p>As a Community Ambassador, you can add new feeds. Please add the URL for RSS or Atom feed</p>
-<form action="{% url 'fediverser-core:community-contentfeed-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
-  {% csrf_token %}
-  <ul class="fields">
-    {% for field in community_feed_form.visible_fields %}
-    <li>
-      {% include "wagtailadmin/shared/field.html" %}
-    </li>
-    {% endfor %}
-    <li>
-      <input type="submit" value="Add Feed" class="button" />
-    </li>
-  </ul>
-</form>
-{% endif %}
-
+{% endwith %}
+{% endwith %}
 
 {% endblock %}
 
