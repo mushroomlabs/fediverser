@@ -43,6 +43,10 @@ class Instance(models.Model):
     software = models.CharField(max_length=30, choices=AP_SERVER_SOFTWARE)
 
     @property
+    def url(self):
+        return f"https://{self.domain}"
+
+    @property
     def mirroring(self):
         return InstanceProxy.objects.filter(domain=self.domain).first()
 

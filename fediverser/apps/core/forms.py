@@ -140,8 +140,7 @@ class InstanceCreateForm(forms.ModelForm):
         parsed_url = urlparse(url)
         domain = parsed_url.hostname
         instance, _ = models.Instance.objects.get_or_create(
-            domain=domain,
-            defaults={"allows_reddit_mirrored_content": False, "software": self.server_software},
+            domain=domain, defaults={"software": self.server_software}
         )
         return instance
 
