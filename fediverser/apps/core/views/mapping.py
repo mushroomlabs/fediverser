@@ -1,5 +1,3 @@
-from allauth.socialaccount.providers.oauth2.views import OAuth2LoginView
-from allauth.socialaccount.providers.reddit.views import RedditAdapter
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import F
@@ -7,7 +5,6 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
-from django.views.generic.base import RedirectView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics
 from wagtail.snippets.views.snippets import SnippetViewSet
@@ -15,13 +12,6 @@ from wagtail.snippets.views.snippets import SnippetViewSet
 from .. import forms, models, serializers
 from ..filters import ChangeRequestFilter, CommunityFilter, InstanceFilter, RedditCommunityFilter
 from .common import CreateView, DetailView, ListView, build_breadcrumbs
-
-
-class RedditConnectionView(RedirectView, OAuth2LoginView):
-    def get_redirect_url(self, *args, **kw):
-        self.adapter = RedditAdapter(self.request)
-        response = self.login(self.request, *args, **kw)
-        return response.url
 
 
 class SubredditCreateView(CreateView):
