@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Count
 
@@ -5,7 +6,7 @@ from fediverser.apps.lemmy.services import LemmyClientRateLimited
 
 from . import tasks
 from .models.accounts import UserAccount
-from .models.activitypub import Community, Instance
+from .models.activitypub import Community, FediversedInstance, Instance
 from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
 from .models.mapping import Category, ChangeRequest
@@ -115,6 +116,26 @@ class InstanceAdmin(admin.ModelAdmin):
     search_fields = ("domain",)
 
     inlines = (CommunityInline,)
+
+
+@admin.register(FediversedInstance)
+class FediversedInstanceAdmin(admin.ModelAdmin):
+    list_display = (
+        "instance",
+        "allows_reddit_signup",
+        "allows_reddit_mirrored_content",
+        "accepts_community_requests",
+    )
+    list_filter = (
+        "allows_reddit_signup",
+        "allows_reddit_mirrored_content",
+        "accepts_community_requests",
+    )
+    list_select_related = ("instance",)
+    search_fields = ("instance__domain",)
+
+    def has_change_permission(self, request, obj=None):
+        return obj is None or obj.instance.domain == settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
 
 
 @admin.register(Community)
