@@ -12,8 +12,20 @@
   {% endif %}
   {% if object.category %}
   <dt>Category</dt>
-  <dd>{{ object.category.name }}</dd>
+  <dd>{{ object.category.full_name }}</dd>
   {% endif %}
+
+  {% with object|subreddit_counterparts as counterparts %}
+  {% if counterparts.exists %}
+  <dt>Recommendation as alternative to:</dt>
+  <dd>
+    {% for subreddit in counterparts.all %}
+    <a href="{% url 'fediverser-core:subreddit-detail' subreddit.name %}">{{ subreddit }}</a>
+    <br />
+    {% endfor %}
+  </dd>
+  {% endif %}
+  {% endwith %}
 </dl>
 <hr />
 
@@ -80,6 +92,14 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
     <th scope="col">Shared on Community</th>
   </thead>
   <tbody>
+    {% for submission in object|submissions_from_related_subreddits %}
+    <tr>
+      <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
+      <td>{{ submission.subreddit.name }}</td>
+      <td>{{ submission.created|naturaltime }}</td>
+      <td></td>
+    </tr>
+    {% endfor %}
     {% for entry in object|latest_feed_entries %}
     <tr>
       <td><a href="{{ entry.link }}" target="_blank">{{ entry.title }}</a></td>

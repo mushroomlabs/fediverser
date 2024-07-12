@@ -9,7 +9,7 @@ from wagtail.telepath import JSContext, adapter
 
 from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
-from fediverser.apps.core.models.reddit import RedditCommunity
+from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
 from fediverser.apps.lemmy.services import InstanceProxy
 
 register = template.Library()
@@ -197,6 +197,20 @@ def latest_feed_entries(community):
     cutoff = now - Entry.MAX_AGE
     entries = Entry.objects.filter(feed__communities__community=community, modified__gte=cutoff)
     return entries.select_related("feed").order_by("-modified")
+
+
+@register.filter
+def submissions_from_related_subreddits(community):
+    now = timezone.now()
+    cutoff = now - RedditSubmission.MAX_AGE
+    return RedditSubmission.objects.filter(
+        subreddit__recommendations__community=community, modified__gte=cutoff
+    )
+
+
+@register.filter
+def subreddit_counterparts(community):
+    return RedditCommunity.objects.filter(recommendations__community=community)
 
 
 @register.simple_tag

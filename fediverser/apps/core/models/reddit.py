@@ -236,6 +236,8 @@ class AbstractRedditItem(TimeStampedModel, StatusModel):
 
 
 class RedditSubmission(AbstractRedditItem):
+    MAX_AGE = datetime.timedelta(days=5)
+
     subreddit = models.ForeignKey(RedditCommunity, related_name="posts", on_delete=models.CASCADE)
     author = models.ForeignKey(
         RedditAccount, null=True, related_name="posts", on_delete=models.SET_NULL
