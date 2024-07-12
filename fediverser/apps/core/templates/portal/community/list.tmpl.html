@@ -7,7 +7,6 @@
     <tr>
       <th scope="col">Community</th>
       <th scope="col">Category</th>
-      <th scope="col">Link</th>
     </tr>
   </thead>
   <tbody>
@@ -18,16 +17,10 @@
           <a href="{% url 'fediverser-core:community-detail' name=community.name instance_domain=community.instance.domain %}" target="_blank">
             {{ community.fqdn }}
           </a>
+          <a href="{{ community.url }}" target="_blank">🌐</a>
         </div>
       </td>
-      <td>{{ community.category.name|default:"Not categorized yet" }}</td>
-      <td>
-        <a href="{{ community.url }}" target="_blank" class="button button--icon">
-          <span class="icon-wrapper">
-            <use>{% icon name="link-external" title=community.name %}</use>
-          </span>
-        </a>
-      </td>
+      <td>{{ community.category.full_name|default:"Not categorized yet" }}</td>
     </tr>
     {% endfor %}
   </tbody>

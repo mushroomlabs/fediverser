@@ -8,9 +8,6 @@
       <th scope="col">Name</th>
       <th scope="col">Category</th>
       <th scope="col">Recommended Alternatives</th>
-      {% if not user.is_staff %}
-      <th scope="col">Subscriber?</th>
-      {% endif %}
       {% if user.is_staff %}
       <th scope="col">Locked</th>
       {% endif %}
@@ -65,15 +62,6 @@
           {% endif %}
         </ul>
       </td>
-      {% if not user.is_staff %}
-      <td>
-        {% if user.is_authenticated %}
-        {% if user|is_subscriber:subreddit.name %}Yes{% else %}No{% endif %}
-        {% else %}
-        <a href="{% url 'wagtailadmin_login' %}">Login required</a>
-        {% endif %}
-      </td>
-      {% endif %}
       {% if user.is_staff %}
       <td>
         <input
