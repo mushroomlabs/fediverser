@@ -1,0 +1,8 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+<li>
+  <a href="{{ original.reddit_view_url }}" class="historylink" target="_blank">View on Reddit</a>
+</li>
+{{ block.super }}
+{% endblock %}
