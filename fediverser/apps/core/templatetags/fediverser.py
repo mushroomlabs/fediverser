@@ -203,9 +203,9 @@ def latest_feed_entries(community):
 def submissions_from_related_subreddits(community):
     now = timezone.now()
     cutoff = now - RedditSubmission.MAX_AGE
-    return RedditSubmission.objects.filter(
+    return RedditSubmission.repostable.filter(
         subreddit__recommendations__community=community, modified__gte=cutoff
-    )
+    ).order_by("-created")
 
 
 @register.filter

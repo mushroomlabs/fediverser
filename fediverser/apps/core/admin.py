@@ -158,17 +158,21 @@ class RedditCommunityAdmin(admin.ModelAdmin):
 
 @admin.register(RedditAccount)
 class RedditAccountAdmin(admin.ModelAdmin):
+    change_form_template = "admin/redditaccount_change_form.html"
+    date_hierarchy = "created"
     list_display = (
         "username",
+        "suspended",
+        "blocked",
         "marked_as_spammer",
         "marked_as_bot",
-        "rejected_invite",
+        "created",
     )
-    list_filter = ("marked_as_spammer", "marked_as_bot")
+    list_filter = ("suspended", "blocked", "marked_as_spammer", "marked_as_bot")
     search_fields = ("username",)
     actions = ("create_lemmy_mirror", "mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
     autocomplete_fields = ("subreddits",)
-    readonly_fields = ("username",)
+    readonly_fields = ("subreddits", "username")
 
     @admin.action(description="Flag as spammer")
     def mark_as_spammer(self, request, queryset):

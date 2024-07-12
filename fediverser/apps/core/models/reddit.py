@@ -5,12 +5,13 @@ from typing import Optional
 import praw
 from django.conf import settings
 from django.db import models
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.db.utils import DataError
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
+from model_utils.managers import QueryManager
 from model_utils.models import StatusModel, TimeStampedModel
 from praw import Reddit
 from prawcore.exceptions import Forbidden, NotFound, UnavailableForLegalReasons
@@ -177,11 +178,12 @@ class RedditCommunity(models.Model):
         verbose_name_plural = "Subreddits"
 
 
-class RedditAccount(models.Model):
+class RedditAccount(TimeStampedModel):
     username = models.CharField(unique=True, max_length=60)
-    rejected_invite = models.BooleanField(default=False)
     marked_as_spammer = models.BooleanField(default=False)
     marked_as_bot = models.BooleanField(default=False)
+    suspended = models.BooleanField(default=False)
+    blocked = models.BooleanField(default=False)
     subreddits = models.ManyToManyField(RedditCommunity, blank=True)
 
     @property
@@ -189,7 +191,6 @@ class RedditAccount(models.Model):
         now = timezone.now()
         return all(
             [
-                self.controller is None,
                 not self.rejected_invite,
                 not self.marked_as_spammer,
                 not self.invites.filter(created__gte=now - datetime.timedelta(days=7)).exists(),
@@ -204,12 +205,27 @@ class RedditAccount(models.Model):
     def is_shadow_account(self):
         return getattr(self, "account", None) is None
 
+    @property
+    def reddit_view_url(self):
+        return f"https://reddit.com/u/{self.username}"
+
     @classmethod
     def make(cls, redditor: praw.models.Redditor):
         if redditor is None:
             return None
 
-        account, _ = cls.objects.get_or_create(username=redditor.name)
+        defaults = {
+            "suspended": getattr(redditor, "is_suspended", False),
+            "blocked": getattr(redditor, "is_blocked", False),
+        }
+        if hasattr(redditor, "created_utc"):
+            created_date = timezone.make_aware(
+                datetime.datetime.fromtimestamp(redditor.created_utc)
+            )
+            defaults["created"] = created_date
+            defaults["modified"] = created_date
+
+        account, _ = cls.objects.update_or_create(username=redditor.name, defaults=defaults)
         return account
 
     def __str__(self):
@@ -256,6 +272,11 @@ class RedditSubmission(AbstractRedditItem):
     over_18 = models.BooleanField(default=False)
     marked_as_spam = models.BooleanField(default=False)
     marked_as_duplicate = models.BooleanField(default=False)
+
+    objects = models.Manager()
+    repostable = QueryManager(Q(author__marked_as_bot=False) & Q(author__marked_as_spammer=False))
+    spam = QueryManager(Q(author__marked_as_spammer=True) | Q(marked_as_spam=True))
+    from_bots = QueryManager(author__marked_as_bot=True)
 
     @property
     def has_self_text(self):
