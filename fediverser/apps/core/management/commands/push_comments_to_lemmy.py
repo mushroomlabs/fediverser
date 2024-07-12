@@ -18,14 +18,14 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         allows_mirroring = Q(
-            reddittolemmycommunity__automatic_comment_policy__in=[
+            mirroring_strategies__automatic_comment_policy__in=[
                 AutomaticCommentPolicies.FULL,
                 AutomaticCommentPolicies.SELF_POST_ONLY,
                 AutomaticCommentPolicies.LINK_ONLY,
             ]
         )
 
-        mapped = Q(reddittolemmycommunity__isnull=False)
+        mapped = Q(mirroring_strategies__isnull=False)
 
         while True:
             time.sleep(1)

@@ -30,8 +30,12 @@ User = get_user_model()
 
 
 class RedditMirrorStrategy(models.Model):
-    subreddit = models.ForeignKey(RedditCommunity, on_delete=models.CASCADE)
-    community = models.ForeignKey(Community, on_delete=models.CASCADE)
+    subreddit = models.ForeignKey(
+        RedditCommunity, related_name="mirroring_strategies", on_delete=models.CASCADE
+    )
+    community = models.ForeignKey(
+        Community, related_name="mirroring_strategies", on_delete=models.CASCADE
+    )
 
     automatic_submission_policy = models.TextField(
         max_length=16,

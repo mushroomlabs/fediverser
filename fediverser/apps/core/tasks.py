@@ -122,14 +122,14 @@ def push_new_submissions_to_lemmy():
 
     is_retrieved = Q(status=RedditSubmission.STATUS.retrieved)
     allows_automatic_mirroring = Q(
-        subreddit__reddittolemmycommunity__automatic_submission_policy__in=[
+        subreddit__mirroring_strategies__automatic_submission_policy__in=[
             AutomaticSubmissionPolicies.FULL,
             AutomaticSubmissionPolicies.SELF_POST_ONLY,
             AutomaticSubmissionPolicies.LINK_ONLY,
         ]
     )
 
-    unmapped = Q(subreddit__reddittolemmycommunity__isnull=True)
+    unmapped = Q(subreddit__mirroring_strategies__isnull=True)
     old_post = Q(created__lte=NOW - datetime.timedelta(days=1))
 
     already_posted = Q(lemmy_mirrored_posts__isnull=False)
@@ -151,9 +151,13 @@ def push_new_submissions_to_lemmy():
         communities = [
             community
             for community in Community.objects.filter(
-                reddittolemmycommunity__subreddit=reddit_submission.subreddit
+                mirroring_strategies__subreddit=reddit_submission.subreddit,
+                mirroring_strategies__automatic_submission_policy__in=[
+                    AutomaticSubmissionPolicies.FULL,
+                    AutomaticSubmissionPolicies.SELF_POST_ONLY,
+                    AutomaticSubmissionPolicies.LINK_ONLY,
+                ],
             )
-            if community.can_accept_automatic_submission(reddit_submission)
         ]
 
         if len(communities) == 0:

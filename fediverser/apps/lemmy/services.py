@@ -34,7 +34,10 @@ def generate_rsa_keypair(keysize: int = 2048):
     return (private_key_pem, public_key_pem)
 
 
-def get_hashed_password(cleartext: str) -> str:
+def get_hashed_password(cleartext: str | None) -> str:
+    if cleartext is None:
+        return LocalUserProxy.UNUSABLE_PASSWORD
+
     salt = bcrypt.gensalt()
     hashed_bytes = bcrypt.hashpw(cleartext.encode(), salt=salt)
     return hashed_bytes.decode()
@@ -64,10 +67,11 @@ class InstanceProxy(models.Instance):
                 "banned": False,
             },
         )
+
         local_user, created = LocalUserProxy.objects.get_or_create(
             person=person,
             defaults={
-                "password_encrypted": password and get_hashed_password(password),
+                "password_encrypted": get_hashed_password(password),
                 "accepted_application": True,
             },
         )
@@ -91,6 +95,8 @@ class CommunityProxy(models.Community):
 
 
 class LocalUserProxy(models.LocalUser):
+    UNUSABLE_PASSWORD = "!"
+
     @property
     def is_bot(self):
         return self.person.bot_account
@@ -99,6 +105,8 @@ class LocalUserProxy(models.LocalUser):
         return self.person.name
 
     def check_password(self, cleartext):
+        if self.password_encrypted == self.UNUSABLE_PASSWORD:
+            return False
         return bcrypt.checkpw(cleartext.encode(), self.password_encrypted.encode())
 
     def check_totp(self, code):
@@ -109,6 +117,11 @@ class LocalUserProxy(models.LocalUser):
         return totp.verify(code)
 
     def make_login_token(self):
+        token = models.LoginToken.objects.filter(user=self).first()
+
+        if token:
+            return token
+
         now = timezone.now()
         claims = {
             "sub": str(self.id),
@@ -132,7 +145,8 @@ class LocalUserProxy(models.LocalUser):
         domain = settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
 
         lemmy_client = Lemmy(f"https://{domain}", raise_exceptions=True)
-        lemmy_client._requestor._auth.login_token = self.make_login_token()
+        login_token = self.make_login_token()
+        lemmy_client._requestor._auth.token = login_token.token
         LEMMY_CLIENTS[username] = lemmy_client
 
         return lemmy_client
@@ -146,12 +160,9 @@ class LocalUserProxy(models.LocalUser):
         except InstanceProxy.DoesNotExist:
             raise ValueError("Could not find Lemmy instance")
 
-        local_user = cls.objects.filter(
+        return cls.objects.filter(
             person__name=username, person__instance=mirror_instance
-        ).first()
-
-        if local_user is None:
-            return mirror_instance.register(username, as_bot=True)
+        ).first() or mirror_instance.register(username, as_bot=True)
 
     @classmethod
     def get_fediverser_bot(cls):

@@ -265,7 +265,7 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
     def post_to_lemmy(self, request, queryset):
         for reddit_submission in queryset:
             for community in Community.objects.filter(
-                reddittolemmycommunity__subreddit=reddit_submission.subreddit
+                mirroring_strategies__subreddit=reddit_submission.subreddit
             ):
                 try:
                     LemmyMirroredPost.make_mirror(
