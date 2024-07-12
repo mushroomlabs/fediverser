@@ -6,10 +6,6 @@
 <dl>
   <dt>Community Page</dt>
   <dd><a href="{{ object.url }}"}} target="_blank">{{ object.fqdn }}</a></dd>
-  {% if object.status %}
-  <dt>Status</dt>
-  <dd>{{ object.get_status_display }}</dd>
-  {% endif %}
   {% if object.category %}
   <dt>Category</dt>
   <dd>{{ object.category.full_name }}</dd>

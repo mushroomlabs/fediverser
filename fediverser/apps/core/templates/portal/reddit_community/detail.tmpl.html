@@ -5,10 +5,6 @@
 <dl>
   <dt>Subreddit Page</dt>
   <dd><a href="{{ object.full_reddit_url }}"}} target="_blank">/r/{{ object.name }}</a></dd>
-  {% if object.status %}
-  <dt>Status</dt>
-  <dd>{{ object.get_status_display }}</dd>
-  {% endif %}
   {% if object.category %}
   <dt>Category</dt>
   <dd>{{ object.category.name }}</dd>
@@ -45,29 +41,6 @@
 
 
 {% if not object.locked %}
-{% if object.status is None %}
-<h3>Current Status</h3>
-{% if not user|has_pending_reddit_status_change_request:object %}
-<p>This status of this subreddit is unknown. Help us by checking this subreddit. If all posts are older than 1 year, feel free to mark it as "Abandoned". If it is closed, quarantined or marked as "private", mark it as close.</p>
-
-<form action="{% url 'fediverser-core:subreddit-statusrecommendation-create' name=object.name %}" method="POST" novalidate>
-  {% csrf_token %}
-  <ul class="fields">
-    {% for field in status_picker_form.visible_fields %}
-    <li>
-      {% include "wagtailadmin/shared/field.html" %}
-    </li>
-    {% endfor %}
-    <li>
-      <input type="submit" value="Submit Status" class="button" />
-    </li>
-  </ul>
-</form>
-{% else %}
-<p>You already provided a status check! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
-{% endif %}
-{% endif %}
-
 
 {% if not object.category %}
 <h3>Category</h3>
