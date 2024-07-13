@@ -27,7 +27,7 @@ stages:
   - release
 
 test:
-  image: python:3.11
+  image: python:3.12
   stage: test
   services:
     - postgres:latest
@@ -40,12 +40,13 @@ test:
 
   script:
     - export
-    - pip install -e .
-    - pytest
+    - pip install poetry
+    - poetry install
+    - poetry run pytest --nomigrations
 
 
 build_python_package:
-  image: python:3.11
+  image: python:3.12
   stage: build
 
   script:
@@ -58,7 +59,7 @@ build_python_package:
 
 
 publish_python_package:
-  image: python:3.11
+  image: python:3.12
   stage: release
 
   script:

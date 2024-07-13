@@ -18,20 +18,20 @@ x-application-environment: &application-environment
 
 steps:
   lint:
-    image: python:3.11-slim
+    image: python:3.12-slim
     commands:
       - pip install flake8
       - flake8
 
   test:
-    image: python:3.11-slim
+    image: python:3.12-slim
     <<: *application-environment
     commands:
       - apt update
       - apt install build-essential cargo -y
       - pip install poetry
       - poetry install
-      - poetry run pytest
+      - poetry run pytest --nomigrations
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
