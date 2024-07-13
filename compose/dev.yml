@@ -1,6 +1,18 @@
 x-developer: &fediverser-development
   user: "${UID:-1000}:${GID:-1000}"
 
+x-lemmy-service: &lemmy-service
+  networks:
+    - internal
+
+x-public-service: &public-service
+  networks:
+    - default
+    - internal
+
+x-internal-service: &internal-service
+  networks:
+    - internal
 
 x-fediverser-dev: &fediverser-dev-service
   <<: *fediverser-development
@@ -8,6 +20,7 @@ x-fediverser-dev: &fediverser-dev-service
   tty: true
   build:
     context: .
+    target: development
   restart: unless-stopped
 
   depends_on: &fediverser-service-dependencies
@@ -16,20 +29,11 @@ x-fediverser-dev: &fediverser-dev-service
     - db
 
   environment: &fediverser_web_envvars
-    DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
-    FEDIVERSER_STATIC_ROOT: /var/fediverser/static
-    FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
-    FEDIVERSER_BROKER_URL: redis://broker:6379/0
-    FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
-    FEDIVERSER_CACHE_LOCATION: redis://cache:6379/0
-    FEDIVERSER_CORS_HEADERS_ENABLED: 1
-    FEDIVERSER_DATABASE_HOST: db
-    FEDIVERSER_DATABASE_PORT: 5432
     FEDIVERSER_DATABASE_NAME: fediverser
     FEDIVERSER_DATABASE_USER: fediverser
     FEDIVERSER_DATABASE_PASSWORD: fediverser
     LEMMY_DATABASE_HOST: lemmy-db
-    LEMMY_DATABASE_PORT: 5432
+    LEMMY_DATABASE_PORT: "5432"
     LEMMY_DATABASE_NAME: lemmy
     LEMMY_DATABASE_USER: lemmy
     LEMMY_DATABASE_PASSWORD: lemmy
@@ -37,76 +41,65 @@ x-fediverser-dev: &fediverser-dev-service
     FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
     FEDIVERSER_DEBUG: "true"
-
+    IPYTHONDIR: /tmp/ipython
 
   env_file:
     - .env
 
   volumes:
     - ./:/app
-    - "${FEDIVERSER_STATIC_MOUNT_PATH:-./docker/volumes/fediverser/media/static}:/var/fediverser/static"
-    - "${FEDIVERSER_MEDIA_MOUNT_PATH:-./docker/volumes/fediverser/media/media}:/var/fediverser/media"
-
+    - static-data:/var/fediverser/static
+    - media-data:/var/fediverser/media
+    - ipython-dev-data:/tmp/ipython
 
 x-webapp: &fediverser-webservice
   command: poetry run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir=/app/fediverser --reload-include *.html
 
 services:
+  cloudflared:
+    <<: *public-service
+    image: cloudflare/cloudflared
+
+    volumes:
+      - cloudflared-credentials-data:/etc/cloudflared
+      - cloudflared-config-data:/home/nonroot/.cloudflared
+
   db:
     <<: *fediverser-development
-    image: "postgres:${FEDIVERSER_POSTGRES_SERVER_VERSION:-latest}"
     restart: unless-stopped
     environment:
       POSTGRES_USER: fediverser
       POSTGRES_PASSWORD: fediverser
       POSTGRES_DB: fediverser
-    volumes:
-      - "${FEDIVERSER_DATABASE_MOUNT_PATH:-./docker/volumes/fediverser/database}:/var/lib/postgresql/data"
-
 
   broker:
-    <<: *fediverser-development
-    image: redis:latest
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 30s
-      retries: 50
-    volumes:
-      - "${FEDIVERSER_BROKER_MOUNT_PATH:-./docker/volumes/fediverser/broker}:/data"
 
   cache:
-    <<: *fediverser-development
-    image: redis:latest
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 30s
-      retries: 50
-    volumes:
-      - "${FEDIVERSER_CACHE_MOUNT_PATH:-./docker/volumes/fediverser/cache}:/data"
 
   admin:
     <<: [*fediverser-dev-service, *fediverser-webservice]
     ports:
-      - 8001:80
+      - "8000:80"
 
   portal:
     <<: [*fediverser-dev-service, *fediverser-webservice]
-    ports:
-      - 8000:80
 
   pull_reddit:
     <<: *fediverser-dev-service
     command: poetry run django-admin pull_from_reddit
 
-  push_lemmy:
+  push_comments_to_lemmy:
     <<: *fediverser-dev-service
-    command: poetry run django-admin push_to_lemmy
+
+  push_submissions_to_lemmy:
+    <<: *fediverser-dev-service
 
   celery:
+    <<: *fediverser-dev-service
+
+  celerybeat:
     <<: *fediverser-dev-service
 
   init_migrate_db:
@@ -118,55 +111,51 @@ services:
     restart: on-failure
 
   lemmy:
-    <<: *fediverser-development
-    image: dessalines/lemmy:0.18.5
+    <<: [*fediverser-development, *lemmy-service]
+    image: dessalines/lemmy:0.19.5
     environment:
-      - RUST_LOG="warn,lemmy_server=info,lemmy_api=info,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info,lemmy_websocket=info"
+      - RUST_LOG="warn,lemmy_server=info,lemmy_api=debug,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info"
     volumes:
-      - "${FEDIVERSER_LEMMY_BACKEND_CONFIG_MOUNT_PATH:-./docker/volumes/lemmy}:/config/"
+      - lemmy-config-data:/config/
     depends_on:
       - lemmy-db
       - lemmy-pictrs
-    ports:
-      - "8536:8536"
 
   lemmy-ui:
-    <<: *fediverser-development
-    image: dessalines/lemmy-ui:0.18.5
+    <<: [*fediverser-development, *lemmy-service]
+    image: dessalines/lemmy-ui:0.19.5
     restart: always
     environment:
       - LEMMY_UI_LEMMY_INTERNAL_HOST=lemmy:8536
     volumes:
-      - "${FEDIVERSER_LEMMY_UI_MOUNT_PATH:-../docker/volumes/lemmy-ui/extra_themes}:/app/extra_themes"
+      - lemmy-ui-themes-data:/app/extra_themes
     depends_on:
       - lemmy
-    ports:
-      - "1234:1234"
 
   lemmy-db:
-    <<: *fediverser-development
-    image: postgres:15
+    <<: [*fediverser-development, *lemmy-service]
+    image: postgres:16
     environment:
-      - POSTGRES_USER=lemmy
-      - POSTGRES_PASSWORD=lemmy
-      - POSTGRES_DB=lemmy
+      POSTGRES_USER: lemmy
+      POSTGRES_PASSWORD: lemmy
+      POSTGRES_DB: lemmy
     volumes:
-      - "${FEDIVERSER_LEMMY_DATABASE_MOUNT_PATH:-./docker/volumes/lemmy-db}:/var/lib/postgresql/data"
+      - lemmy-db-data:/var/lib/postgresql/data
     restart: always
 
   lemmy-pictrs:
-    image: asonix/pictrs:0.4.5
-    user: 991:991
+    <<: [*fediverser-development, *lemmy-service]
+    image: asonix/pictrs:0.5.16
     environment:
       PICTRS__API_KEY: pictrs_pass
       RUST_BACKTRACE: full
-      PICTRS__MEDIA__FORMAT: webp
+      PICTRS__MEDIA__IMAGE__FORMAT: webp
       PICTRS__MEDIA__ENABLE_FULL_VIDEO: "true"
       PICTRS__MEDIA__VIDEO_CODEC: vp9
-      PICTRS__MEDIA__GIF__MAX_WIDTH: 1920
-      PICTRS__MEDIA__GIF__MAX_HEIGHT: 1080
-      PICTRS__MEDIA__GIF__MAX_AREA: 2073600
-      PICTRS__MEDIA__GIF__MAX_FRAME_COUNT: 1800
+      PICTRS__MEDIA__ANIMATION__MAX_WIDTH: 1920
+      PICTRS__MEDIA__ANIMATION__MAX_HEIGHT: 1080
+      PICTRS__MEDIA__ANIMATION__MAX_AREA: 2073600
+      PICTRS__MEDIA__ANIMATION__MAX_FRAME_COUNT: 1800
       PICTRS__STORE__TYPE: object_storage
       PICTRS__STORE__ENDPOINT: "http://lemmy-minio:9000"
       PICTRS__STORE__BUCKET_NAME: "lemmy-media"
@@ -174,25 +163,25 @@ services:
       PICTRS__STORE__USE_PATH_STYLE: "true"
       PICTRS__STORE__ACCESS_KEY: minio_user
       PICTRS__STORE__SECRET_KEY: minio_pass
-
     restart: always
+    volumes:
+      - lemmy-pictrs-data:/mnt
 
   lemmy-proxy:
+    <<: *lemmy-service
     image: nginx:1-alpine
     restart: on-failure
     ports:
-      - "8888:80"
+      - "80:80"
     volumes:
-      - "${FEDIVERSER_LEMMY_NGINX_CONFIG_MOUNT_PATH:-./docker/volumes/lemmy/nginx}:/etc/nginx/:ro"
+      - lemmy-nginx-config-data:/etc/nginx/:ro
 
     depends_on:
       - lemmy
       - lemmy-ui
-      - lemmy-db
-      - lemmy-pictrs
 
   lemmy-minio:
-    <<: *fediverser-development
+    <<: [*fediverser-development, *lemmy-service]
     image: minio/minio
     command: server /data
     environment:
@@ -201,9 +190,10 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - "${FEDIVERSER_LEMMY_MEDIA_MOUNT_PATH:-./docker/volumes/lemmy-media}:/data"
+      - lemmy-media-data:/data
 
   init_minio_buckets:
+    <<: *lemmy-service
     image: minio/mc
     environment:
       MINIO_ROOT_USER: minio_user
@@ -220,3 +210,103 @@ services:
       /usr/bin/mc anonymous set public fediverser/lemmy-media;
       exit 0;
       "
+
+volumes:
+  static-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_STATIC_MOUNT_PATH?Variable not set}"
+
+  media-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_MEDIA_MOUNT_PATH?Variable not set}"
+
+  postgresql-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_DATABASE_MOUNT_PATH?Variable not set}"
+
+  broker-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_BROKER_MOUNT_PATH?Variable not set}"
+
+  cache-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_CACHE_MOUNT_PATH?Variable not set}"
+
+  ipython-dev-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_IPYTHON_DATA_PATH?Variable not set}"
+
+  lemmy-db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_LEMMY_DATABASE_MOUNT_PATH?Variable not set}"
+
+  lemmy-pictrs-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_LEMMY_PICTRS_MOUNT_PATH?Variable not set}"
+
+  lemmy-config-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_LEMMY_BACKEND_CONFIG_MOUNT_PATH?Variable not set}"
+
+  lemmy-ui-themes-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_LEMMY_UI_MOUNT_PATH?Variable not set}"
+
+  lemmy-nginx-config-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_LEMMY_NGINX_CONFIG_MOUNT_PATH?Variable not set}"
+
+  lemmy-media-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_LEMMY_MEDIA_MOUNT_PATH?Variable not set}"
+
+
+  cloudflared-credentials-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_CLOUDFLARE_CREDENTIALS_PATH?Variable not set}"
+
+  cloudflared-config-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_CLOUDFLARE_CONFIG_PATH?Variable not set}"

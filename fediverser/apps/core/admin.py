@@ -1,8 +1,23 @@
+from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Count
 
-from . import models, tasks
-from .exceptions import LemmyClientRateLimited, RejectedComment, RejectedPost
+from fediverser.apps.lemmy.services import LemmyClientRateLimited
+
+from . import tasks
+from .models.accounts import UserAccount
+from .models.activitypub import Community, FediversedInstance, Instance
+from .models.feeds import CommunityFeed, Entry, Feed
+from .models.invites import CommunityInviteTemplate
+from .models.mapping import Category, ChangeRequest
+from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
+from .models.reddit import (
+    RedditAccount,
+    RedditComment,
+    RedditCommunity,
+    RedditSubmission,
+    RejectedPost,
+)
 
 
 class ReadOnlyMixin:
@@ -13,54 +28,172 @@ class ReadOnlyMixin:
         return False
 
 
-class LemmyCommunityInline(admin.TabularInline):
-    model = models.LemmyCommunity
+@admin.register(UserAccount)
+class UserAccountAdmin(admin.ModelAdmin):
+    list_display = ("username", "reddit_account", "lemmy_local_username")
+    list_select_related = ("user", "reddit_account")
+
+    @admin.display(boolean=False, description="username")
+    def username(self, obj):
+        return obj.user.username
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Feed)
+class FeedAdmin(admin.ModelAdmin):
+    date_hierarchy = "last_fetched"
+    list_display = ("url", "title", "last_fetched")
+
+    actions = ("fetch_feeds",)
+
+    @admin.action(description="Fetch entries for selected feeds")
+    def fetch_feeds(self, request, queryset):
+        for feed in queryset:
+            try:
+                feed.fetch(force=True)
+                messages.success(request, f"Feed {feed.url} has been updated")
+            except Exception as exc:
+                messages.error(request, f"Failed to fetch {feed.url}: {exc}")
+
+
+@admin.register(Entry)
+class FeedEntryAdmin(admin.ModelAdmin):
+    date_hierarchy = "created"
+    list_display = ("link", "title", "feed", "created", "modified")
+    list_filter = ("feed",)
+
+
+@admin.register(CommunityFeed)
+class CommunityFeedAdmin(admin.ModelAdmin):
+    list_display = ("feed", "community")
+
+
+@admin.register(ChangeRequest)
+class ChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ("description", "requester", "status")
+    list_filter = ("status",)
+
+    actions = ("accept_changes", "reject_changes")
+
+    @admin.action(description="Accept requested changes")
+    def accept_changes(self, request, queryset):
+        for change_request in queryset.select_subclasses():
+            change_request.accept()
+
+    @admin.action(description="Reject requested changes")
+    def reject_changes(self, request, queryset):
+        for change_request in queryset.select_subclasses():
+            change_request.reject()
+
+    def get_queryset(self, *args, **kw):
+        qs = super().get_queryset(*args, **kw)
+        return qs.select_subclasses()
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("full_name", "description")
+
+    @admin.display(boolean=False, description="Category")
+    def full_name(self, obj):
+        return obj.full_name
+
+    def get_queryset(self, request, *args, **kw):
+        qs = super().get_queryset(request, *args, **kw)
+        return qs.with_tree_fields()
+
+
+class CommunityInline(admin.TabularInline):
+    model = Community
     fields = ("name",)
     extra = 1
 
 
-@admin.register(models.LemmyInstance)
-class LemmyInstanceAdmin(admin.ModelAdmin):
+@admin.register(Instance)
+class InstanceAdmin(admin.ModelAdmin):
     search_fields = ("domain",)
 
-    inlines = (LemmyCommunityInline,)
+    inlines = (CommunityInline,)
 
 
-@admin.register(models.LemmyCommunity)
-class LemmyCommunityAdmin(admin.ModelAdmin):
-    list_display = ("name", "instance")
+@admin.register(FediversedInstance)
+class FediversedInstanceAdmin(admin.ModelAdmin):
+    list_display = (
+        "instance",
+        "allows_reddit_signup",
+        "allows_reddit_mirrored_content",
+        "accepts_community_requests",
+    )
+    list_filter = (
+        "allows_reddit_signup",
+        "allows_reddit_mirrored_content",
+        "accepts_community_requests",
+    )
     list_select_related = ("instance",)
+    search_fields = ("instance__domain",)
+
+    def has_change_permission(self, request, obj=None):
+        return obj is None or obj.instance.domain == settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
+
+
+@admin.register(Community)
+class CommunityAdmin(admin.ModelAdmin):
+    list_display = ("name", "instance")
+    list_filter = ("category",)
+    list_select_related = ("instance", "category")
     search_fields = ("name", "instance__domain")
     autocomplete_fields = ("instance",)
 
+    def has_change_permission(self, request, obj=None):
+        return False
 
-@admin.register(models.RedditCommunity)
+
+@admin.register(RedditCommunity)
 class RedditCommunityAdmin(admin.ModelAdmin):
-    list_display = ("name", "last_synced_at")
-    search_fields = ("name",)
+    change_form_template = "admin/redditcommunity_change_form.html"
 
-    actions = ("fetch_new_posts",)
+    list_display = (
+        "name",
+        "category",
+        "over18",
+        "advertiser_category",
+        "locked",
+        "reported_subscribers",
+        "last_synced_at",
+    )
+    search_fields = ("name",)
+    actions = ("get_metadata", "fetch_new_posts")
 
     @admin.action(description="Fetch new submissions")
     def fetch_new_posts(self, request, queryset):
         for subreddit_name in queryset.values_list("name", flat=True):
             tasks.fetch_new_posts.delay(subreddit_name=subreddit_name)
 
+    @admin.action(description="Fetch Metadata")
+    def get_metadata(self, request, queryset):
+        for subreddit in queryset:
+            subreddit.get_metadata()
 
-@admin.register(models.RedditAccount)
+
+@admin.register(RedditAccount)
 class RedditAccountAdmin(admin.ModelAdmin):
+    change_form_template = "admin/redditaccount_change_form.html"
+    date_hierarchy = "created"
     list_display = (
         "username",
-        "controller",
+        "suspended",
+        "blocked",
         "marked_as_spammer",
         "marked_as_bot",
-        "rejected_invite",
+        "created",
     )
-    list_filter = ("marked_as_spammer", "marked_as_bot")
+    list_filter = ("suspended", "blocked", "marked_as_spammer", "marked_as_bot")
     search_fields = ("username",)
     actions = ("create_lemmy_mirror", "mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
     autocomplete_fields = ("subreddits",)
-    readonly_fields = ("controller", "username", "password")
+    readonly_fields = ("subreddits", "username")
 
     @admin.action(description="Flag as spammer")
     def mark_as_spammer(self, request, queryset):
@@ -80,21 +213,22 @@ class RedditAccountAdmin(admin.ModelAdmin):
             account.register_mirror()
 
 
-@admin.register(models.RedditToLemmyCommunity)
-class RedditToLemmyCommunityAdmin(admin.ModelAdmin):
+@admin.register(RedditMirrorStrategy)
+class RedditMirrorStrategyAdmin(admin.ModelAdmin):
     list_display = (
         "subreddit",
-        "lemmy_community",
+        "community",
         "automatic_submission_policy",
         "automatic_comment_policy",
         "automatic_submission_limit",
     )
     list_filter = ("automatic_submission_policy", "automatic_comment_policy")
-    autocomplete_fields = ("subreddit", "lemmy_community")
+    autocomplete_fields = ("subreddit", "community")
 
 
-@admin.register(models.RedditSubmission)
+@admin.register(RedditSubmission)
 class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
+    change_form_template = "admin/redditsubmission_change_form.html"
     date_hierarchy = "created"
     list_display = (
         "title",
@@ -148,20 +282,22 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
     @admin.action(description="Fetch data from Reddit")
     def fetch_from_reddit(self, request, queryset):
         for reddit_submission in queryset:
-            models.RedditSubmission.make(
+            RedditSubmission.make(
                 subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
             )
 
     @admin.action(description="Post Submission to Lemmy")
     def post_to_lemmy(self, request, queryset):
         for reddit_submission in queryset:
-            for community in models.LemmyCommunity.objects.filter(
-                reddittolemmycommunity__subreddit=reddit_submission.subreddit
+            for community in Community.objects.filter(
+                mirroring_strategies__subreddit=reddit_submission.subreddit
             ):
                 try:
-                    reddit_submission.post_to_lemmy(community)
+                    LemmyMirroredPost.make_mirror(
+                        reddit_submission=reddit_submission, community=community
+                    )
                 except RejectedPost as exc:
-                    reddit_submission.status = models.RedditSubmission.STATUS.rejected
+                    reddit_submission.status = RedditSubmission.STATUS.rejected
                     reddit_submission.save()
                     messages.error(request, f"Post {reddit_submission.id} rejected: {exc}")
                 except Exception as exc:
@@ -176,15 +312,11 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
             for mirrored_post in reddit_submission.lemmy_mirrored_posts.all():
                 for comment in reddit_submission.comments.filter(parent=None):
                     try:
-                        comment.make_mirror(mirrored_post=mirrored_post, include_children=True)
-                    except RejectedComment as exc:
-                        messages.warning(
-                            request,
-                            f"Failed to post {comment.id}: {exc}",
+                        LemmyMirroredComment.make_mirror(
+                            reddit_comment=comment,
+                            mirrored_post=mirrored_post,
+                            include_children=True,
                         )
-                        comment.status = models.RedditComment.STATUS.rejected
-                        comment.save()
-
                     except LemmyClientRateLimited:
                         messages.warning("Stop due to being rate-limit")
                         return
@@ -194,7 +326,7 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
         posts = queryset.select_related("author", "subreddit")
         for post in posts.exclude(subreddit__invite_templates__isnull=True):
             if post.author.can_send_invite:
-                tasks.send_lemmy_community_invite_to_redditor(
+                tasks.send_community_invite_to_redditor(
                     redditor_name=post.author.username, subreddit_name=post.subreddit.name
                 )
 
@@ -211,7 +343,7 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
         return queryset.update(marked_as_duplicate=True)
 
 
-@admin.register(models.RedditComment)
+@admin.register(RedditComment)
 class RedditCommentAdmin(ReadOnlyMixin, admin.ModelAdmin):
     date_hierarchy = "created"
     list_display = ("submission_id", "author", "body", "is_spam")
@@ -234,22 +366,32 @@ class RedditCommentAdmin(ReadOnlyMixin, admin.ModelAdmin):
         return queryset.update(marked_as_spam=False)
 
 
-@admin.register(models.LemmyCommunityInviteTemplate)
-class LemmyCommunityInviteTemplateAdmin(admin.ModelAdmin):
-    list_display = ("subreddit", "lemmy_community")
-    list_filter = ("subreddit", "lemmy_community")
-    autocomplete_fields = ("subreddit", "lemmy_community")
+@admin.register(CommunityInviteTemplate)
+class CommunityInviteTemplateAdmin(admin.ModelAdmin):
+    list_display = ("subreddit", "community")
+    list_filter = ("subreddit", "community")
+    autocomplete_fields = ("subreddit", "community")
 
 
-@admin.register(models.LemmyMirroredComment)
+@admin.register(LemmyMirroredComment)
 class LemmyMirroredCommentAdmin(admin.ModelAdmin):
-    list_display = ("reddit_comment_id", "lemmy_comment_id", "lemmy_community")
-    list_select_related = ("lemmy_mirrored_post", "lemmy_mirrored_post__lemmy_community")
-    list_filter = ("lemmy_mirrored_post__lemmy_community",)
+    list_display = ("reddit_comment_id", "lemmy_comment_id", "community")
+    list_select_related = ("lemmy_mirrored_post", "lemmy_mirrored_post__community")
+    list_filter = ("lemmy_mirrored_post__community",)
     search_fields = ("reddit_comment_id", "lemmy_comment_id")
 
-    def lemmy_community(self, obj):
-        return obj.lemmy_mirrored_post.lemmy_community
+    def community(self, obj):
+        return obj.lemmy_mirrored_post.community
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LemmyMirroredPost)
+class LemmyMirroredPostAdmin(admin.ModelAdmin):
+    list_display = ("reddit_submission", "community")
+    list_select_related = ("reddit_submission", "community")
+    list_filter = ("community",)
 
     def has_change_permission(self, request, obj=None):
         return False

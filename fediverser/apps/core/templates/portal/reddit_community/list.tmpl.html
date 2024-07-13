@@ -1,0 +1,139 @@
+{% extends "portal/generic/listing.tmpl.html" %}
+{% load i18n account wagtailadmin_tags fediverser %}
+
+{% block listing %}
+<table class="listing listing--inline-actions">
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col">Category</th>
+      <th scope="col">Recommended Alternatives</th>
+      {% if user.is_staff %}
+      <th scope="col">Locked</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for subreddit in object_list %}
+    <tr>
+      <td class="title">
+        <div class="title-wrapper">
+          <a href="{% url 'fediverser-core:subreddit-detail' name=subreddit.name %}">
+            {{ subreddit.name }}
+          </a>
+        </div>
+      </td>
+      <td>
+        {% if subreddit.category %}
+        {{ subreddit.category }}
+        {% else %}
+        <form action="{% url 'fediverser-core:subreddit-categoryrecommendation-create' name=subreddit.name %}" method="POST" name="bulk_category_picker" novalidate>
+          {% csrf_token %}
+          <ul class="fields">
+            {% for field in category_picker_form.visible_fields %}
+            <li>
+              {% include "wagtailadmin/shared/field.html" %}
+            </li>
+            {% endfor %}
+          </ul>
+        </form>
+        {% endif %}
+      </td>
+      <td>
+        <ul>
+          {% for recommendation in subreddit.recommendations.all %}
+          <li><a href="{{ recommendation.community.url }}" target="_blank">!{{ recommendation.community.fqdn }}</a></li>
+          {% endfor %}
+          {% for community in subreddit.candidate_communities %}
+          <li><a href="{{ community.url }}" target="_blank">!{{ community.fqdn }} (Pending Review)</a></li>
+          {% endfor %}
+          {% if not subreddit.locked %}
+          <li>
+            <a href="{% url 'fediverser-core:subreddit-alternativerecommendation-create' name=subreddit.name %}">
+              Recommend a community
+            </a>
+          </li>
+          {% if subreddit|is_missing_community_recommendations %}
+          <a href="{% url 'fediverser-core:subreddit-communityrequest-create' name=subreddit.name %}">
+            Request the creation of new community
+          </a>
+          {% endif %}
+
+          {% endif %}
+        </ul>
+      </td>
+      {% if user.is_staff %}
+      <td>
+        <input
+            type="checkbox"
+            data-url="{% url 'fediverser-core:subreddit-lock' name=subreddit.name %}"
+            {% if subreddit.locked %}checked{% endif %}
+        />
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+
+
+{% block extra_js %}
+{{ block.super }}
+<script type="text/javascript">
+ function submitSelection(selectNodes, attribute) {
+   selectNodes.forEach(function(elem) {
+     elem.addEventListener('change', function(evt) {
+       const form = evt.target.closest("form");
+       const cell = evt.target.closest("td");
+       const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]')
+       const url = form.getAttribute("action");
+       const formData = new FormData();
+
+       const optionNode = evt.target.querySelector(`option[value="${evt.target.value}"]`);
+
+       formData.append("csrfmiddlewaretoken", csrfToken.value);
+       formData.append(attribute, evt.target.value);
+
+       fetch(url, {
+         method: 'POST',
+         body: formData
+       }).then(response => cell.textContent = optionNode.text);
+     })
+   });
+ }
+
+ window.addEventListener('load', function(){
+   let categoryPickers = document.querySelectorAll("form[name=bulk_category_picker] select");
+   let statusPickers = document.querySelectorAll("form[name=bulk_status_picker] select");
+   let lockCheckboxes = document.querySelectorAll("table input[type=checkbox]");
+   submitSelection(categoryPickers, "category");
+   submitSelection(statusPickers, "community_status");
+
+   lockCheckboxes.forEach(function(elem) {
+     elem.addEventListener("change", function(evt) {
+       const url = elem.getAttribute("data-url");
+       const method = elem.checked ? "POST" : "DELETE";
+
+       fetch(url, {method: method});
+     });
+   });
+ });
+</script>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+ table form[name=bulk_category_picker] label,  table form[name=bulk_status_picker] label {
+     display: none;
+ }
+ table form select {
+     max-width: 80px;
+ }
+
+ label[for=id_search], div.w-field.w-field--char_field.w-field--text_input[data-contentpath=search] {
+     display: none;
+ }
+</style>
+{% endblock %}

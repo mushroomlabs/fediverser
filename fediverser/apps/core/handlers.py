@@ -3,11 +3,17 @@ import logging
 from allauth.socialaccount.models import SocialAccount, SocialApp, SocialToken
 from allauth.socialaccount.signals import pre_social_login, social_account_updated
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
-from .models import RedditAccount, RedditCommunity, make_reddit_user_client
-from .tasks import clone_redditor, subscribe_to_lemmy_community
+from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
+
+from .models.accounts import UserAccount
+from .models.feeds import Feed
+from .models.mirroring import LemmyMirroredPost
+from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
+from .tasks import fetch_feed, post_mirror_disclosure, subscribe_to_community
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -16,29 +22,51 @@ User = get_user_model()
 REDDIT_PROVIDER = "reddit"
 
 
-@receiver(post_save, sender=RedditAccount)
-def on_reddit_account_created_make_mirror(sender, **kw):
+@receiver(post_save, sender=LemmyMirroredPost)
+def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
     if kw["created"] and not kw["raw"]:
-        reddit_account = kw["instance"]
-        if reddit_account.controller is None:
-            clone_redditor.delay(reddit_account.username, as_bot=True)
+        mirrored_post = kw["instance"]
+        post_mirror_disclosure.delay(mirrored_post.id)
 
 
 @receiver(post_save, sender=SocialAccount)
-def on_reddit_user_connected_account_update_reddit_account(sender, **kw):
+def on_reddit_user_login_attempt_lemmy_(sender, **kw):
     social_account = kw["instance"]
 
-    if social_account.provider == REDDIT_PROVIDER:
+    if kw["created"] and social_account.provider == REDDIT_PROVIDER:
         reddit_username = social_account.extra_data["name"]
 
-        reddit_account, created = RedditAccount.objects.update_or_create(
-            username=reddit_username, defaults={"controller": social_account.user}
+        reddit_account, new_redditor = RedditAccount.objects.get_or_create(
+            username=reddit_username
         )
 
-        if created:
-            reddit_account.register_mirror(as_bot=False)
+        try:
+            user_account, _ = UserAccount.objects.get_or_create(
+                reddit_account=reddit_account, user=social_account.user
+            )
+        except IntegrityError:
+            logger.warning("User already is associated with different reddit account")
+            return
+
+        if user_account.lemmy_local_user is not None:
+            logger.info("User is already connected on Lemmy")
+            return
+
+        homonym = LocalUserProxy.objects.filter(person__name__iexact=reddit_username).first()
+
+        if homonym is None:
+            lemmy_instance = InstanceProxy.get_connected_instance()
+            lemmy_instance.register(reddit_username, as_bot=False)
+            user_account.lemmy_local_username = reddit_username
+            user_account.save()
+
+        elif homonym.is_bot:
+            lemmy_instance = InstanceProxy.get_connected_instance()
+            lemmy_instance.unbot(reddit_username)
+            user_account.lemmy_local_username = reddit_username
+            user_account.save()
         else:
-            reddit_account.unbot_mirror()
+            logger.info("Not creating account on Lemmy because username is taken")
 
 
 @receiver(pre_social_login)
@@ -82,20 +110,22 @@ def on_reddit_account_updated_save_access_token(sender, **kw):
 
 
 @receiver(m2m_changed, sender=RedditAccount.subreddits.through)
-def on_subreddit_added_subscribe_to_corresponding_lemmy_community(sender, **kw):
+def on_subreddit_added_subscribe_to_corresponding_community(sender, **kw):
     action = kw["action"]
 
     if action == "post_add" and not kw["reverse"]:
         reddit_account = kw["instance"]
-        if not reddit_account.is_initial_password_in_use:
-            logger.warning("Account is taken over by owner, can not do anything on their behalf")
-            return
-
+        lemmy_user = LocalUserProxy.get_mirror_user(reddit_account.username)
         for subreddit_id in kw["pk_set"]:
             subreddit = RedditCommunity.objects.filter(id=subreddit_id).first()
             if not subreddit:
                 continue
-            for mapping in subreddit.reddittolemmycommunity_set.all():
-                subscribe_to_lemmy_community.delay(
-                    reddit_account.username, mapping.lemmy_community.id
-                )
+            for recommendation in subreddit.recommendations.all():
+                subscribe_to_community.delay(lemmy_user.id, recommendation.community.id)
+
+
+@receiver(post_save, sender=Feed)
+def on_feed_created_fetch_entries(sender, **kw):
+    if kw["created"]:
+        feed = kw["instance"]
+        fetch_feed.delay(feed_url=feed.url)

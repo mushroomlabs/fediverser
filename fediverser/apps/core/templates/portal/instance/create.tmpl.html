@@ -1,0 +1,9 @@
+{% extends "portal/generic/form.tmpl.html" %}
+
+{% block before_form %}
+{% include "portal/partials/header.tmpl.html" with title="Add Instance" search_url=None search_disable_async=True %}
+{% endblock %}
+
+{% block actions %}
+<input type="submit" value="Submit" class="button" />
+{% endblock %}

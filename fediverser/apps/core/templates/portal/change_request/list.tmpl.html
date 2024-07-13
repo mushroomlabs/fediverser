@@ -1,0 +1,24 @@
+{% extends "portal/generic/listing.tmpl.html" %}
+
+{% block listing %}
+<table class="listing listing--inline-actions">
+  <thead>
+    <tr>
+      <th scope="col">Action</th>
+      <th scope="col">Status</th>
+      <th scope="col">Time</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for change_request in object_list %}
+    <tr>
+      <td class="title">
+        <div class="title-wrapper">{{ change_request.description }}</div>
+      </td>
+      <td>{{ change_request.status }}</td>
+      <td>{{ change_request.status_changed }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

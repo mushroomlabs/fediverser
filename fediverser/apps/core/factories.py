@@ -6,39 +6,50 @@ import factory.fuzzy
 from django.db.models import signals
 from django.template.defaultfilters import slugify
 
-from . import models
+from .models.activitypub import Community, Instance
+from .models.mapping import RedditToCommunityRecommendation
+from .models.mirroring import RedditMirrorStrategy
+from .models.reddit import RedditAccount, RedditCommunity, RedditSubmission
 
 BASE36_ALPHABET = string.digits + string.ascii_lowercase
 
 
-class LemmyInstanceFactory(factory.django.DjangoModelFactory):
+class InstanceFactory(factory.django.DjangoModelFactory):
     domain = factory.Sequence(lambda n: f"{n:03}.example.com")
 
     class Meta:
-        model = models.LemmyInstance
+        model = Instance
 
 
-class LemmyCommunityFactory(factory.django.DjangoModelFactory):
-    instance = factory.SubFactory(LemmyInstanceFactory)
+class CommunityFactory(factory.django.DjangoModelFactory):
+    instance = factory.SubFactory(InstanceFactory)
     name = factory.Sequence(lambda n: f"community-{n:03}")
 
     class Meta:
-        model = models.LemmyCommunity
+        model = Community
 
 
 class RedditCommunityFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f"test-subreddit-{n:03}")
 
     class Meta:
-        model = models.RedditCommunity
+        model = RedditCommunity
 
 
-class RedditToLemmyCommunityFactory(factory.django.DjangoModelFactory):
+class RedditToCommunityRecommendationFactory(factory.django.DjangoModelFactory):
     subreddit = factory.SubFactory(RedditCommunityFactory)
-    lemmy_community = factory.SubFactory(LemmyCommunityFactory)
+    community = factory.SubFactory(CommunityFactory)
 
     class Meta:
-        model = models.RedditToLemmyCommunity
+        model = RedditToCommunityRecommendation
+
+
+class RedditMirrorStrategyFactory(factory.django.DjangoModelFactory):
+    subreddit = factory.SubFactory(RedditCommunityFactory)
+    community = factory.SubFactory(CommunityFactory)
+
+    class Meta:
+        model = RedditMirrorStrategy
 
 
 @factory.django.mute_signals(signals.post_save)
@@ -46,7 +57,7 @@ class RedditAccountFactory(factory.django.DjangoModelFactory):
     username = factory.Sequence(lambda n: "reddit-user-{n:04}")
 
     class Meta:
-        model = models.RedditAccount
+        model = RedditAccount
 
 
 class RedditSubmissionFactory(factory.django.DjangoModelFactory):
@@ -57,7 +68,7 @@ class RedditSubmissionFactory(factory.django.DjangoModelFactory):
     url = factory.Sequence(lambda n: "https://test-{n:03}.example.com")
 
     class Meta:
-        model = models.RedditSubmission
+        model = RedditSubmission
 
 
 class SelfPostFactory(RedditSubmissionFactory):
@@ -68,4 +79,4 @@ class SelfPostFactory(RedditSubmissionFactory):
     selftext_html = '<div class="md"><p>This is just a self-post.</p></div>'
 
     class Meta:
-        model = models.RedditSubmission
+        model = RedditSubmission

@@ -1,0 +1,149 @@
+{% extends "portal/generic/base.tmpl.html" %}
+{% load fediverser humanize wagtailadmin_tags %}
+
+{% lemmy_instance %}
+{% block main_content %}
+<dl>
+  <dt>Community Page</dt>
+  <dd><a href="{{ object.url }}"}} target="_blank">{{ object.fqdn }}</a></dd>
+  {% if object.category %}
+  <dt>Category</dt>
+  <dd>{{ object.category.full_name }}</dd>
+  {% endif %}
+
+  {% with object|subreddit_counterparts as counterparts %}
+  {% if counterparts.exists %}
+  <dt>Recommendation as alternative to:</dt>
+  <dd>
+    {% for subreddit in counterparts.all %}
+    <a href="{% url 'fediverser-core:subreddit-detail' subreddit.name %}">{{ subreddit }}</a>
+    <br />
+    {% endfor %}
+  </dd>
+  {% endif %}
+  {% endwith %}
+</dl>
+<hr />
+
+{% if not object.category %}
+<h3>Category</h3>
+{% if not user|pending_community_category_proposal:object %}
+<p>This community has not been properly categorized yet. Please indicate the category which closest describe it:</p>
+<form action="{% url 'fediverser-core:community-categoryrecommendation-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in category_picker_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Category" class="button" />
+    </li>
+  </ul>
+</form>
+{% else %}
+<p>You already recommended a category! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
+{% endif %}
+{% endif %}
+
+
+<h2>Community Ambassadors</h2>
+<p>Interested in helping {{ object.fqdn }} grow can become a <strong>Community Ambassador</strong>? You will be able to:</p>
+
+<ul>
+  <li>Create curated sources of content which can be easily shared with the community</li>
+  <li>Reach out to users on Reddit that might be interested in migrating to the Fediverse</li>
+  <li>Define policies for content bridging between the Fediverse and Reddit</li>
+</ul>
+{% if user|is_ambassador:object %}
+You are enrolled as an ambassador for {{ object.fqdn }}.
+{% elif user|has_pending_ambassador_application:object %}
+<p>Your application has been received and will be reviewed by an admin.</p>
+{% else %}
+<form action="{% url 'fediverser-core:community-ambassador-application-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <input type="submit" value="Submit Application" class="button" />
+</form>
+{% endif %}
+
+<hr />
+<h2>Content Feeds</h2>
+<p>
+  Community Ambassadors can select and curate a list of content feeds
+  from around the web. The idea is to help find out the content that
+  is relevant to the communities on the Fediverse and stimulate user
+  participation. Take a look at the entries below, share them directly
+  on {{ object.fqdn }} with one click.
+</p>
+
+{% if user|is_ambassador:object %}
+<p>As a Community Ambassador, you can add new feeds. Please add the URL for RSS or Atom feed</p>
+<form action="{% url 'fediverser-core:community-contentfeed-create' name=object.name instance_domain=object.instance.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  {% formattedfield field=community_feed_form.feed %}
+  <input type="submit" value="Add Feed" class="button" />
+</form>
+{% endif %}
+
+<hr />
+
+{% with object|latest_feed_entries as feed_entries %}
+{% with object|submissions_from_related_subreddits as reddit_submissions %}
+{% if feed_entries.exists or reddit_submissions.exists %}
+
+<h2>Content Suggestions</h2>
+<p>Here are some of the recent entries that might be interesting to post to {{ object.fqdn }}</p>
+<table class="listing listing--inline-actions">
+  <thead>
+    <tr>
+    <th scope="col">Title</th>
+    <th scope="col">Source</th>
+    <th scope="col">Published On</th>
+    <th scope="col">Post to Lemmy</th>
+  </thead>
+  <tbody>
+    {% for submission in reddit_submissions %}
+    <tr>
+      <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
+      <td>{{ submission.subreddit.name }}</td>
+      <td>{{ submission.created|naturaltime }}</td>
+      <td>
+        {% if submission.can_be_submitted_automatically and not submission.url|posted_to_community:object %}
+        <a class="button text-replace button--icon"
+            role="link"
+            href="{% url 'fediverser-core:community-repost-reddit' name=object.name instance_domain=object.instance.domain %}?url={{ submission.url|urlencode}}">
+          {% icon name="upload" %}
+          Post
+        </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% for entry in feed_entries %}
+    <tr>
+      <td><a href="{{ entry.link }}" target="_blank">{{ entry.title }}</a></td>
+      <td>{{ entry.feed.link }}</td>
+      <td>{{ entry.modified|naturaltime }}</td>
+      <td></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>The Community Ambassadors for {{ object.fqdn }} have not defined any RSS feed that might be relevant</p>
+{% endif %}
+{% endwith %}
+{% endwith %}
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ category_picker_form.media.js }}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{{ category_picker_form.media.css }}
+{% endblock %}

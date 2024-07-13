@@ -12,9 +12,13 @@ class FediverserCeleryConfig(object):
     broker_use_ssl = "FEDIVERSER_BROKER_USE_SSL" in os.environ
     beat_scheduler = "django_celery_beat.schedulers:DatabaseScheduler"
     beat_schedule = {
-        "push-to-lemmy": {
-            "task": "fediverser.apps.core.tasks.push_updates_to_lemmy",
+        "fetch_content_feeds": {
+            "task": "fediverser.apps.core.tasks.fetch_feeds",
             "schedule": crontab(),
+        },
+        "clear_old_feed_entries": {
+            "task": "fediverser.apps.core.tasks.clear_old_feed_entries",
+            "schedule": crontab(minute=0, hour=0),
         },
     }
 

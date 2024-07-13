@@ -1,0 +1,28 @@
+{% extends "portal/generic/listing.tmpl.html" %}
+{% load wagtailadmin_tags %}
+
+{% block listing %}
+<table class="listing listing--inline-actions">
+  <thead>
+    <tr>
+      <th scope="col">Community</th>
+      <th scope="col">Category</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for community in object_list %}
+    <tr>
+      <td class="title">
+        <div class="title-wrapper">
+          <a href="{% url 'fediverser-core:community-detail' name=community.name instance_domain=community.instance.domain %}" target="_blank">
+            {{ community.fqdn }}
+          </a>
+          <a href="{{ community.url }}" target="_blank">🌐</a>
+        </div>
+      </td>
+      <td>{{ community.category.full_name|default:"Not categorized yet" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

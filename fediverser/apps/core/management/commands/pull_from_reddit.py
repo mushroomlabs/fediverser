@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from fediverser.apps.core.choices import AutomaticSubmissionPolicies
-from fediverser.apps.core.models import (
+from fediverser.apps.core.models.reddit import (
     RedditComment,
     RedditCommunity,
     RedditSubmission,
@@ -39,9 +39,9 @@ def refresh_subreddits(client):
     current_time = timezone.now()
     cutoff = current_time - QUERYING_INTERVAL
 
-    mapped_subreddits = RedditCommunity.objects.filter(reddittolemmycommunity__isnull=False)
-    automated_subreddits = mapped_subreddits.exclude(
-        reddittolemmycommunity__automatic_submission_policy=AutomaticSubmissionPolicies.NONE
+    mirrored_subreddits = RedditCommunity.objects.filter(mirroring_strategies__isnull=False)
+    automated_subreddits = mirrored_subreddits.exclude(
+        mirroring_strategies__automatic_submission_policy=AutomaticSubmissionPolicies.NONE
     )
 
     subreddit_map = {r.name.lower(): r for r in automated_subreddits}
