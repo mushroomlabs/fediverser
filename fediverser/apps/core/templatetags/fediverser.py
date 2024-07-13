@@ -181,7 +181,10 @@ def is_subscriber(user, subreddit_name):
 
 @register.filter
 def is_ambassador(user, community):
-    return user.account.representing_communities.filter(community=community).exists()
+    return (
+        user.is_authenticated
+        and user.account.representing_communities.filter(community=community).exists()
+    )
 
 
 @register.filter
