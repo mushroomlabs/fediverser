@@ -37,7 +37,7 @@ class ChangeRequest(StatusModel):
 
     @property
     def description(self):
-        return f"Change request #{self.id}"
+        return f"Change request #{self.id} {self.__class__.__name__}"
 
     def apply(self):
         raise NotImplementedError("Child classes need to implement this method")
@@ -60,7 +60,7 @@ class SetRedditCommunityCategory(ChangeRequest):
 
     @property
     def description(self):
-        return f"Recommend {self.category.name} as category {self.subreddit}"
+        return f"Recommend {self.category.name} as category to {self.subreddit}"
 
     def apply(self):
         self.subreddit.category = self.category

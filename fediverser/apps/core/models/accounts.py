@@ -48,7 +48,7 @@ class CommunityAmbassadorApplication(ChangeRequest):
 
     @property
     def description(self):
-        return f"{self.requester} wants to become an ambassador of {self.community}"
+        return f"Submit Application to become an ambassador for {self.community}"
 
     def apply(self):
         self.requester.account.representing_communities.create(community=self.community)
