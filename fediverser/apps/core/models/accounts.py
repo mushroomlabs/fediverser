@@ -24,6 +24,11 @@ class UserAccount(models.Model):
     lemmy_local_username = models.CharField(max_length=255, unique=True, null=True, blank=True)
 
     @property
+    def lemmy_client(self):
+        lemmy_user = self.lemmy_local_user
+        return lemmy_user and lemmy_user.make_lemmy_client()
+
+    @property
     def lemmy_local_user(self):
         return LocalUserProxy.objects.filter(person__name=self.lemmy_local_username).first()
 

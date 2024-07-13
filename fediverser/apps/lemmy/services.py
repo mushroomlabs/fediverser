@@ -3,6 +3,7 @@ import jwt
 import pyotp
 from Crypto.PublicKey import RSA
 from django.conf import settings
+from django.db.models import QuerySet
 from django.utils import timezone
 from pythorhead import Lemmy
 
@@ -41,6 +42,13 @@ def get_hashed_password(cleartext: str | None) -> str:
     salt = bcrypt.gensalt()
     hashed_bytes = bcrypt.hashpw(cleartext.encode(), salt=salt)
     return hashed_bytes.decode()
+
+
+class CommunityQuerySet(QuerySet):
+    def get_by_fqdn(self, community_fqdn):
+        name, domain = community_fqdn.split("@")
+        name = name.removeprefix("!")
+        return self.get(name=name, instance__domain=domain)
 
 
 class InstanceProxy(models.Instance):
@@ -90,6 +98,8 @@ class InstanceProxy(models.Instance):
 
 
 class CommunityProxy(models.Community):
+    objects = CommunityQuerySet.as_manager()
+
     class Meta:
         proxy = True
 

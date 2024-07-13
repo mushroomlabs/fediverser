@@ -37,6 +37,11 @@ urlpatterns = [
         name="community-detail",
     ),
     path(
+        "communities/<str:name>@<str:instance_domain>/repost/reddit",
+        views.CommunityRepostRedditSubmissionView.as_view(),
+        name="community-repost-reddit",
+    ),
+    path(
         "communities/<str:name>@<str:instance_domain>/recommend/category",
         views.CommunityCategoryRecommendationCreateView.as_view(),
         name="community-categoryrecommendation-create",
@@ -72,7 +77,7 @@ urlpatterns = [
     path(
         "api/community-requests",
         views.CommunityRequestListView.as_view(),
-        name="community-request-list",
+        name="api-community-request-list",
     ),
     path(
         "api/subreddits",

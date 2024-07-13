@@ -191,7 +191,6 @@ class RedditAccount(TimeStampedModel):
         now = timezone.now()
         return all(
             [
-                not self.rejected_invite,
                 not self.marked_as_spammer,
                 not self.invites.filter(created__gte=now - datetime.timedelta(days=7)).exists(),
             ]
@@ -274,7 +273,13 @@ class RedditSubmission(AbstractRedditItem):
     marked_as_duplicate = models.BooleanField(default=False)
 
     objects = models.Manager()
-    repostable = QueryManager(Q(author__marked_as_bot=False) & Q(author__marked_as_spammer=False))
+    repostable = QueryManager(
+        Q(author__marked_as_bot=False)
+        & Q(author__marked_as_spammer=False)
+        & Q(removed=False)
+        & Q(quarantined=False)
+        & ~Q(selftext="[removed]")
+    )
     spam = QueryManager(Q(author__marked_as_spammer=True) | Q(marked_as_spam=True))
     from_bots = QueryManager(author__marked_as_bot=True)
 
@@ -318,7 +323,6 @@ class RedditSubmission(AbstractRedditItem):
                 self.url is not None and not self.url.startswith("https://twitter.com"),
                 self.url is not None and not self.url.startswith("https://x.com"),
                 not self.is_video_hosted_on_reddit,
-                not self.is_gallery_hosted_on_reddit,
                 not self.marked_as_spam,
                 not self.marked_as_duplicate,
                 self.author is not None and not self.author.marked_as_bot,
@@ -364,24 +368,6 @@ class RedditSubmission(AbstractRedditItem):
             assert self.selftext != "[removed]", "Post content was removed on reddit"
         except AssertionError as exc:
             raise RejectedPost(str(exc))
-
-    def to_lemmy_post_payload(self):
-        MAX_TITLE_LENGTH = 200
-
-        post_title = self.title[:MAX_TITLE_LENGTH]
-
-        payload = dict(
-            name=post_title,
-            nsfw=self.over_18,
-        )
-
-        if self.is_link_post:
-            payload["url"] = self.url
-
-        if self.has_self_text:
-            payload["body"] = self.selftext
-
-        return payload
 
     @classmethod
     def make(cls, subreddit: RedditCommunity, post: praw.models.Submission):

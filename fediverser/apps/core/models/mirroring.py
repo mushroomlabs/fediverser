@@ -1,13 +1,14 @@
 import datetime
 import logging
 import os
+import secrets
 import tempfile
+from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
-from django.template.defaultfilters import slugify
 from django.template.loader import render_to_string
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
@@ -142,6 +143,109 @@ class LemmyMirroredPost(TimeStampedModel):
         except LemmyProxyUserNotConfigured:
             logger.warning("Missing configuration for proxy user")
 
+    @staticmethod
+    def reddit_to_lemmy_post(reddit_submission):
+        MAX_TITLE_LENGTH = 200
+
+        post_title = reddit_submission.title[:MAX_TITLE_LENGTH]
+
+        payload = dict(
+            name=post_title,
+            nsfw=reddit_submission.over_18,
+        )
+
+        if reddit_submission.is_link_post:
+            payload["url"] = reddit_submission.url
+
+        if reddit_submission.has_self_text:
+            payload["body"] = reddit_submission.selftext
+
+        return payload
+
+    @staticmethod
+    def lemmy_post_payload_to_query_string(post_payload):
+        query_string = {
+            "url": post_payload.get("url"),
+            "title": post_payload.get("name"),
+            "body": post_payload.get("body"),
+            "languageId": post_payload.get("language_id"),
+            "communityId": post_payload.get("community_id"),
+        }
+
+        return urlencode({k: v for k, v in query_string.items() if v is not None})
+
+    @staticmethod
+    def mirror_media(lemmy_client, media_url):
+        _, suffix = media_url.rsplit(".", 1)
+
+        file_name = f"{secrets.token_urlsafe(30)}.{suffix}"
+
+        try:
+            download = requests.get(media_url)
+            download.raise_for_status()
+            with tempfile.TemporaryDirectory() as td:
+                file_path = os.path.join(td, file_name)
+                with open(file_path, "w+b") as f:
+                    f.write(download.content)
+                upload_response = lemmy_client.image.upload(file_path)
+            return upload_response[0]["image_url"]
+        except (TypeError, AttributeError, KeyError):
+            return None
+
+    @classmethod
+    def prepare_lemmy_post_from_reddit_submission(
+        cls, lemmy_client, reddit_submission, community: Community
+    ):
+        payload = LemmyMirroredPost.reddit_to_lemmy_post(reddit_submission)
+
+        post_language = (
+            reddit_submission.language
+            if reddit_submission.language in community.languages
+            else LanguageType.UNDETERMINED
+        )
+
+        payload.update(
+            {
+                "language_id": post_language.value,
+                "community_id": lemmy_client.discover_community(community.fqdn),
+            }
+        )
+
+        if reddit_submission.is_gallery_hosted_on_reddit:
+            gallery = []
+
+            for media_item in reddit_submission.praw_object.media_metadata.items():
+                media_url = media_item[1]["p"][0]["u"]
+                media_url = media_url.split("?", 1)[0]
+                media_url = media_url.replace("preview", "i")
+                mirrored_url = LemmyMirroredPost.mirror_media(lemmy_client, media_url)
+                if mirrored_url is not None:
+                    gallery.append(mirrored_url)
+            head, *rest = gallery
+
+            if not head:
+                raise RejectedPost("Could not get any image from gallery")
+
+            payload["url"] = head
+            payload["body"] = "\n\n".join(["![](url)" for url in rest])
+            return payload
+
+        if reddit_submission.is_image_hosted_on_reddit:
+            try:
+                image_url = LemmyMirroredPost.mirror_media(lemmy_client, reddit_submission.url)
+                assert image_url is not None, "Image could not be uploaded"
+                payload["url"] = image_url
+            except AssertionError as exc:
+                raise RejectedPost({exc})
+
+        if reddit_submission.is_link_post:
+            payload["url"] = reddit_submission.url
+
+        if reddit_submission.has_self_text:
+            payload["body"] = reddit_submission.selftext
+
+        return payload
+
     @classmethod
     def make_mirror(cls, reddit_submission, community, lemmy_user=None):
         mirrored_post = cls.objects.filter(
@@ -149,47 +253,18 @@ class LemmyMirroredPost(TimeStampedModel):
         ).first()
 
         if mirrored_post is None:
-            reddit_submission.validate()
-
             logger.info(f"Syncing reddit post {reddit_submission.id} to {community.name}")
             if lemmy_user is None:
                 lemmy_user = LocalUserProxy.get_mirror_user(reddit_submission.author.username)
             lemmy_client = lemmy_user.make_lemmy_client()
 
-            post_language = (
-                reddit_submission.language
-                if reddit_submission.language in community.languages
-                else LanguageType.UNDETERMINED
-            )
-
-            payload = reddit_submission.to_lemmy_post_payload()
-
-            payload.update(
-                {
-                    "community_id": lemmy_client.discover_community(community.fqdn),
-                    "language_id": post_language.value,
-                }
-            )
-
-            if reddit_submission.is_image_hosted_on_reddit:
-                _, suffix = reddit_submission.url.rsplit(".", 1)
-
-                file_name = ".".join([slugify(reddit_submission.title), suffix])
-
-                image_download = requests.get(reddit_submission.url)
-                image_download.raise_for_status()
-                with tempfile.TemporaryDirectory() as td:
-                    file_path = os.path.join(td, file_name)
-                    with open(file_path, "w+b") as f:
-                        f.write(image_download.content)
-                    upload_response = lemmy_client.image.upload(file_path)
-                try:
-                    payload["url"] = upload_response[0]["image_url"]
-                except (TypeError, AttributeError, KeyError):
-                    raise RejectedPost("Image could not be uploaded")
-
             with transaction.atomic():
                 try:
+                    reddit_submission.validate()
+                    payload = cls.prepare_lemmy_post_from_reddit_submission(
+                        lemmy_client, reddit_submission, community
+                    )
+
                     lemmy_post = lemmy_client.post.create(**payload)
                     mirrored_post = cls.objects.create(
                         reddit_submission=reddit_submission,

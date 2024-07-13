@@ -10,7 +10,7 @@ from wagtail.telepath import JSContext, adapter
 from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
-from fediverser.apps.lemmy.services import InstanceProxy
+from fediverser.apps.lemmy.services import CommunityProxy, InstanceProxy
 
 register = template.Library()
 
@@ -211,6 +211,15 @@ def submissions_from_related_subreddits(community):
 @register.filter
 def subreddit_counterparts(community):
     return RedditCommunity.objects.filter(recommendations__community=community)
+
+
+@register.filter
+def posted_to_community(url, community):
+    try:
+        lemmy_community = CommunityProxy.objects.get_by_fqdn(community.fqdn)
+        return lemmy_community.post_set.filter(url=url).exists()
+    except CommunityProxy.DoesNotExist:
+        return True
 
 
 @register.simple_tag

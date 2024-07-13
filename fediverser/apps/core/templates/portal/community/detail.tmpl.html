@@ -100,7 +100,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
     <th scope="col">Title</th>
     <th scope="col">Source</th>
     <th scope="col">Published On</th>
-    <th scope="col">Shared on Community</th>
+    <th scope="col">Post to Lemmy</th>
   </thead>
   <tbody>
     {% for submission in reddit_submissions %}
@@ -108,13 +108,22 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
       <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
       <td>{{ submission.subreddit.name }}</td>
       <td>{{ submission.created|naturaltime }}</td>
-      <td></td>
+      <td>
+        {% if submission.can_be_submitted_automatically and not submission.url|posted_to_community:object %}
+        <a class="button text-replace button--icon"
+            role="link"
+            href="{% url 'fediverser-core:community-repost-reddit' name=object.name instance_domain=object.instance.domain %}?url={{ submission.url|urlencode}}">
+          {% icon name="upload" %}
+          Post
+        </a>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
     {% for entry in feed_entries %}
     <tr>
       <td><a href="{{ entry.link }}" target="_blank">{{ entry.title }}</a></td>
-      <td>{{ entry.feed.url }}</td>
+      <td>{{ entry.feed.link }}</td>
       <td>{{ entry.modified|naturaltime }}</td>
       <td></td>
     </tr>

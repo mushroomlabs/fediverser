@@ -3,6 +3,7 @@ from django.test import TestCase
 
 from fediverser.apps.core import factories
 from fediverser.apps.core.choices import AutomaticSubmissionPolicies
+from fediverser.apps.core.models.mirroring import LemmyMirroredPost
 
 
 @pytest.mark.django_db(transaction=True)
@@ -18,7 +19,7 @@ class LemmyInstanceTestCase(BaseTestCase):
         self.assertEqual(self.instance.domain, "test.example.com")
 
 
-class RedditMirrorStrategyTestCasee(BaseTestCase):
+class RedditMirrorStrategyTestCase(BaseTestCase):
     def test_can_make_automatic_submission_policies(self):
         strategy = factories.RedditMirrorStrategyFactory(
             automatic_submission_policy=AutomaticSubmissionPolicies.FULL
@@ -33,7 +34,7 @@ class RedditMirrorStrategyTestCasee(BaseTestCase):
         self.assertFalse(strategy.accepts_link_posts)
 
 
-class RedditSubmissionTestCase(BaseTestCase):
+class MirroredPostTestCase(BaseTestCase):
     def test_self_posts_are_not_linked_to_reddit(self):
         post = factories.RedditSubmissionFactory(
             url="https://www.reddit.com/r/testing/comments/17fuc65/this_is_a_test_post/",
@@ -46,7 +47,7 @@ class RedditSubmissionTestCase(BaseTestCase):
         self.assertFalse(post.is_link_post)
         self.assertFalse(post.is_cross_post)
 
-        lemmy_post_payload = post.to_lemmy_post_payload()
+        lemmy_post_payload = LemmyMirroredPost.reddit_to_lemmy_post(post)
         self.assertTrue("url" not in lemmy_post_payload)
         self.assertTrue("body" in lemmy_post_payload)
         self.assertEqual(lemmy_post_payload["body"], "And self posts are not linked back")
@@ -63,10 +64,10 @@ class RedditSubmissionTestCase(BaseTestCase):
         self.assertTrue(post.is_link_post)
         self.assertFalse(post.is_cross_post)
 
-        lemmy_post_payload = post.to_lemmy_post_payload()
+        lemmy_post_payload = LemmyMirroredPost.reddit_to_lemmy_post(post)
         self.assertTrue("url" in lemmy_post_payload)
         self.assertTrue("body" in lemmy_post_payload)
         self.assertEqual(lemmy_post_payload["body"], "A cool URI is one which does not change.")
 
 
-__all__ = ["LemmyInstanceTestCase", "RedditSubmissionTestCase"]
+__all__ = ("LemmyInstanceTestCase", "RedditMirrorStrategyTestCase", "MirroredPostTestCase")
