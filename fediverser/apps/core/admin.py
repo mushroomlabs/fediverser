@@ -1,8 +1,8 @@
-from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Count
 
 from fediverser.apps.lemmy.services import LemmyClientRateLimited
+from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
 from . import tasks
 from .models.accounts import UserAccount
@@ -135,7 +135,7 @@ class FediversedInstanceAdmin(admin.ModelAdmin):
     search_fields = ("instance__domain",)
 
     def has_change_permission(self, request, obj=None):
-        return obj is None or obj.instance.domain == settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
+        return obj is None or obj.instance.domain == lemmy_settings.Instance.domain
 
 
 @admin.register(Community)

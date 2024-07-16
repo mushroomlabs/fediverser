@@ -1,5 +1,4 @@
 from django import template
-from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import json_script
@@ -10,6 +9,7 @@ from wagtail.telepath import JSContext, adapter
 from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
+from fediverser.apps.core.settings import app_settings
 from fediverser.apps.lemmy.services import CommunityProxy, InstanceProxy
 
 register = template.Library()
@@ -232,9 +232,9 @@ def lemmy_instance():
 
 @register.simple_tag
 def fediverser_hub_site():
-    return settings.FEDIVERSER_HUB_SITE
+    return app_settings.Hub.url
 
 
 @register.simple_tag
 def site_name():
-    return settings.SITE_NAME
+    return app_settings.Portal.name

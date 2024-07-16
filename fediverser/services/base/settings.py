@@ -282,13 +282,17 @@ for app in INTERNAL_APPS:
 
 
 # Instance-specific
-CONNECTED_LEMMY_INSTANCE_DOMAIN = env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None)
-FEDIVERSER_HUB_SITE = env.str("FEDIVERSER_HUB_SITE", default="https://fediverser.network")
-FEDIVERSER_BOT_USERNAME = env.str("FEDIVERSER_BOT_USERNAME", default=None)
-FEDIVERSER_BOT_PASSWORD = env.str("FEDIVERSER_BOT_PASSWORD", default=None)
-PORTAL_URL = env.str("FEDIVERSER_PORTAL_URL", default=None)
 SITE_NAME = env.str("FEDIVERSER_SITE_NAME", default="Fediverser Portal")
-
-
-# Wagtail
 WAGTAIL_SITE_NAME = SITE_NAME
+
+FEDIVERSER = {
+    "PORTAL_URL": env.str("FEDIVERSER_PORTAL_URL", default=None),
+    "PORTAL_NAME": SITE_NAME,
+    "HUB_URL": env.str("FEDIVERSER_HUB_URL", default="https://fediverser.network"),
+}
+
+FEDIVERSED_LEMMY = {
+    "INSTANCE_DOMAIN": env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None),
+    "BOT_USERNAME": env.str("FEDIVERSER_BOT_USERNAME", default=None),
+    "BOT_PASSWORD": env.str("FEDIVERSER_BOT_PASSWORD", default=None),
+}

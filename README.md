@@ -47,6 +47,7 @@ Before you begin, ensure you have met the following requirements:
    - `FEDIVERSER_REDDIT_CLIENT_ID`: Your Reddit API client ID.
    - `FEDIVERSER_REDDIT_CLIENT_SECRET`: Your Reddit API client secret.
    - `FEDIVERSER_CONNECTED_LEMMY_INSTANCE`: The domain of your fediverse instance (e.g., lemmy.example.com).
+   - `FEDIVERSER_PORTAL_URL`: The url for your portal site (which your users will use to actually sign up to Lemmy)
 
 ## Usage
 
