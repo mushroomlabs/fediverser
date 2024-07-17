@@ -91,12 +91,9 @@ class InstanceProxy(models.Instance):
 
     @classmethod
     def get_connected_instance(cls):
-        try:
-            domain = app_settings.Instance.domain
-            assert domain is not None, "Lemmy server configuration is not provided"
-            return cls.objects.get(domain=domain)
-        except AssertionError as exc:
-            raise ValueError(exc)
+        domain = app_settings.Instance.domain
+
+        return domain and cls.objects.filter(domain=domain).first()
 
     class Meta:
         proxy = True

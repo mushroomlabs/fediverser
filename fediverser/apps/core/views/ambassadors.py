@@ -1,12 +1,10 @@
 import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.views.generic.base import RedirectView
-
-from fediverser.apps.lemmy.services import CommunityProxy
 
 from ..models.accounts import CommunityAmbassadorApplication
 from ..models.activitypub import Community
@@ -34,17 +32,22 @@ class CommunityAmbassadorApplicationCreateView(CreateView):
 
 
 class CommunityRepostRedditSubmissionView(LoginRequiredMixin, RedirectView):
+    def get(self, *args, **kw):
+        lemmy_client = self.request.user.account.lemmy_client
+        if lemmy_client is None:
+            return HttpResponse("User is not connected to any Lemmy account", status=421)
+
+        return super().get(*args, **kw)
+
     def get_redirect_url(self, *args, **kw):
         community = get_object_or_404(
             Community,
             name=self.kwargs["name"],
             instance__domain=self.kwargs["instance_domain"],
         )
-        lemmy_community = CommunityProxy.objects.get_by_fqdn(community.fqdn)
-        create_post_url = f"https://{lemmy_community.instance.domain}/create_post"
+        lemmy_client = self.request.user.account.lemmy_client
         original_url = self.request.GET.get("url")
         reddit_submission = get_object_or_404(RedditSubmission, url=original_url)
-        lemmy_client = self.request.user.account.lemmy_client
         try:
             post_payload = LemmyMirroredPost.prepare_lemmy_post_from_reddit_submission(
                 lemmy_client, reddit_submission, community
@@ -54,6 +57,7 @@ class CommunityRepostRedditSubmissionView(LoginRequiredMixin, RedirectView):
             post_payload = {"url": original_url}
 
         query_string = LemmyMirroredPost.lemmy_post_payload_to_query_string(post_payload)
+        create_post_url = f"https://{lemmy_client._requestor.domain}/create_post"
         return f"{create_post_url}?{query_string}"
 
 

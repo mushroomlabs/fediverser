@@ -3,7 +3,7 @@ from django.db import models
 
 from fediverser.apps.lemmy.services import LocalUserProxy
 
-from .activitypub import Community
+from .activitypub import Community, Person
 from .feeds import CommunityFeed
 from .mapping import ChangeRequest
 from .reddit import RedditAccount
@@ -20,6 +20,9 @@ class UserAccount(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
     )
+    lemmy_account = models.OneToOneField(
+        Person, related_name="portal_account", null=True, blank=True, on_delete=models.SET_NULL
+    )
     community_feeds = models.ManyToManyField(CommunityFeed)
     lemmy_local_username = models.CharField(max_length=255, unique=True, null=True, blank=True)
 
@@ -30,6 +33,9 @@ class UserAccount(models.Model):
 
     @property
     def lemmy_local_user(self):
+        if not settings.FEDIVERSER_ENABLE_LEMMY_INTEGRATION:
+            return None
+
         return LocalUserProxy.objects.filter(person__name=self.lemmy_local_username).first()
 
     def check_lemmy_password(self, cleartext):

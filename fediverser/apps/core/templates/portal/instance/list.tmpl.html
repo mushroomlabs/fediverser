@@ -18,7 +18,7 @@
           <a href="{% url 'fediverser-core:instance-detail' domain=instance.domain %}">
             {{ instance.domain }}
           </a>
-          <a href="{{ object.url }}" target="_blank">🌐</a>
+          <a href="{{ instance.url }}" target="_blank">🌐</a>
         </div>
       </td>
       <td>{{ instance.get_software_display }}</td>

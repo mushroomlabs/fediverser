@@ -1,7 +1,9 @@
 import logging
 
-from allauth.socialaccount.models import SocialAccount, SocialApp, SocialToken
+from allauth.socialaccount.models import SocialAccount, SocialToken
+from allauth.socialaccount.providers.reddit.provider import RedditProvider
 from allauth.socialaccount.signals import pre_social_login, social_account_updated
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.db.models.signals import m2m_changed, post_save
@@ -13,13 +15,11 @@ from .models.accounts import UserAccount
 from .models.feeds import Feed
 from .models.mirroring import LemmyMirroredPost
 from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
+from .settings import app_settings
 from .tasks import fetch_feed, post_mirror_disclosure, subscribe_to_community
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-
-
-REDDIT_PROVIDER = "reddit"
 
 
 @receiver(post_save, sender=LemmyMirroredPost)
@@ -33,7 +33,7 @@ def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
 def on_reddit_user_login_attempt_lemmy_(sender, **kw):
     social_account = kw["instance"]
 
-    if kw["created"] and social_account.provider == REDDIT_PROVIDER:
+    if kw["created"] and social_account.provider == RedditProvider.id:
         reddit_username = social_account.extra_data["name"]
 
         reddit_account, new_redditor = RedditAccount.objects.get_or_create(
@@ -75,23 +75,24 @@ def on_reddit_token_provider_get_subreddits(sender, **kw):
 
     social_account = social_login.account
     social_token = social_login.token
-    social_application = SocialApp.objects.filter(provider=REDDIT_PROVIDER).first()
+    social_application = app_settings.reddit_social_application
 
-    if social_application is not None:
-        reddit = make_reddit_user_client(
-            social_application=social_application, refresh_token=social_token.token_secret
-        )
+    reddit = make_reddit_user_client(
+        social_application=social_application, refresh_token=social_token.token_secret
+    )
 
-        reddit_username = social_account.extra_data["name"]
-        subreddit_names = [s.display_name for s in reddit.user.subreddits()]
-        reddit_account, _ = RedditAccount.objects.get_or_create(username=reddit_username)
+    reddit_username = social_account.extra_data["name"]
+    subreddit_names = [
+        s.display_name for s in reddit.user.subreddits() if not s.display_name.startswith("u_")
+    ]
+    reddit_account, _ = RedditAccount.objects.get_or_create(username=reddit_username)
 
-        for subreddit_name in subreddit_names:
-            try:
-                subreddit = RedditCommunity.objects.get(name__iexact=subreddit_name)
-            except RedditCommunity.DoesNotExist:
-                subreddit = RedditCommunity.objects.create(name=subreddit_name)
-            reddit_account.subreddits.add(subreddit)
+    for subreddit_name in subreddit_names:
+        try:
+            subreddit = RedditCommunity.objects.get(name__iexact=subreddit_name)
+        except RedditCommunity.DoesNotExist:
+            subreddit = RedditCommunity.objects.create(name=subreddit_name)
+        reddit_account.subreddits.add(subreddit)
 
 
 @receiver(social_account_updated)
@@ -111,8 +112,10 @@ def on_reddit_account_updated_save_access_token(sender, **kw):
 
 @receiver(m2m_changed, sender=RedditAccount.subreddits.through)
 def on_subreddit_added_subscribe_to_corresponding_community(sender, **kw):
-    action = kw["action"]
+    if not settings.FEDIVERSER_ENABLE_LEMMY_INTEGRATION:
+        return
 
+    action = kw["action"]
     if action == "post_add" and not kw["reverse"]:
         reddit_account = kw["instance"]
         lemmy_user = LocalUserProxy.get_mirror_user(reddit_account.username)

@@ -77,7 +77,23 @@ class FediversedInstance(models.Model):
     )
 
 
-class Community(models.Model):
+class ActorMixin:
+    instance = models.ForeignKey(Instance, on_delete=models.CASCADE)
+
+    @property
+    def fqdn(self):
+        return f"{self.name}@{self.instance.domain}"
+
+    @classmethod
+    def get_metadata(cls, url):
+        scraper = make_ap_client()
+        response = scraper.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
+
+class Community(models.Model, ActorMixin):
     instance = models.ForeignKey(Instance, related_name="communities", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
@@ -89,10 +105,6 @@ class Community(models.Model):
         on_delete=models.SET_NULL,
     )
     tags = TaggableManager(blank=True)
-
-    @property
-    def fqdn(self):
-        return f"{self.name}@{self.instance.domain}"
 
     @property
     def url(self):
@@ -122,17 +134,18 @@ class Community(models.Model):
     def __str__(self):
         return self.fqdn
 
-    @classmethod
-    def get_metadata(cls, url):
-        scraper = make_ap_client()
-        response = scraper.get(url)
-        response.raise_for_status()
-
-        return response.json()
-
     class Meta:
         unique_together = ("instance", "name")
         verbose_name_plural = "Communities"
 
 
-__all__ = ("Instance", "Community")
+class Person(models.Model, ActorMixin):
+    instance = models.ForeignKey(Instance, related_name="users", on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+
+    @property
+    def url(self):
+        return f"https://{self.instance.domain}/u/{self.name}"
+
+
+__all__ = ("Instance", "Community", "Person")
