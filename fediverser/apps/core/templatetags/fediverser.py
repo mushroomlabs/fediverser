@@ -1,5 +1,4 @@
 from django import template
-from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import json_script
@@ -12,7 +11,6 @@ from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
 from fediverser.apps.core.settings import app_settings
-from fediverser.apps.lemmy.services import CommunityProxy
 from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
 register = template.Library()
