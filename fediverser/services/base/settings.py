@@ -64,7 +64,6 @@ THIRD_PARTY_APPS = (
 INTERNAL_APPS = (
     "fediverser.apps.core",
     "fediverser.apps.lemmy",
-    "fediverser.apps.web",
 )
 
 INSTALLED_APPS = INTERNAL_APPS + THIRD_PARTY_APPS + DJANGO_APPS
@@ -104,6 +103,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "fediverser.services.base.wsgi.application"
 
+
+# Instance-specific
+SITE_NAME = env.str("FEDIVERSER_SITE_NAME", default="Fediverser Portal")
+WAGTAIL_SITE_NAME = SITE_NAME
+FEDIVERSER_ENABLE_LEMMY_INTEGRATION = env.bool("FEDIVERSER_ENABLE_LEMMY", default=True)
+
+FEDIVERSER = {
+    "URL": env.str("FEDIVERSER_PORTAL_URL", default=None),
+    "NAME": SITE_NAME,
+    "HUB_URL": env.str("FEDIVERSER_HUB_URL", default="https://fediverser.network"),
+    "REDDIT_SIGNUP_ENABLED": env.bool("FEDIVERSER_ENABLE_REDDIT_SIGNUP", default=True),
+    "GLOBAL_LEMMY_INSTANCE_LOCATOR": env.bool(
+        "FEDIVERSER_GLOBAL_LEMMY_INSTANCE_LOCATOR", default=False
+    ),
+}
+
+FEDIVERSED_LEMMY = (
+    {
+        "INSTANCE_DOMAIN": env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None),
+        "BOT_USERNAME": env.str("FEDIVERSER_BOT_USERNAME", default=None),
+        "BOT_PASSWORD": env.str("FEDIVERSER_BOT_PASSWORD", default=None),
+    }
+    if FEDIVERSER_ENABLE_LEMMY_INTEGRATION
+    else {}
+)
+
+
 # Cache
 CACHES = {
     "default": {
@@ -114,8 +140,19 @@ CACHES = {
 }
 
 # Celery
-
 CELERY_BROKER_URL = env.str("FEDIVERSER_BROKER_URL", default="redis://redis:6379/0")
+
+# Database
+LEMMY_DB = {
+    "ENGINE": env.str("LEMMY_DATABASE_ENGINE", default="django.db.backends.postgresql_psycopg2"),
+    "NAME": env.str("LEMMY_DATABASE_NAME", default="lemmy"),
+    "USER": env.str("LEMMY_DATABASE_USER", default="lemmy"),
+    "PASSWORD": env.str("LEMMY_DATABASE_PASSWORD", default=None),
+    "HOST": env.str("LEMMY_DATABASE_HOST", default="lemmy-db"),
+    "PORT": env.int("LEMMY_DATABASE_PORT", default=5432),
+}
+
+DUMMY_DB = {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DATABASES = {
@@ -127,16 +164,7 @@ DATABASES = {
         "HOST": env.str("FEDIVERSER_DATABASE_HOST", default="db"),
         "PORT": env.int("FEDIVERSER_DATABASE_PORT", default=5432),
     },
-    "lemmy": {
-        "ENGINE": env.str(
-            "LEMMY_DATABASE_ENGINE", default="django.db.backends.postgresql_psycopg2"
-        ),
-        "NAME": env.str("LEMMY_DATABASE_NAME", default="lemmy"),
-        "USER": env.str("LEMMY_DATABASE_USER", default="lemmy"),
-        "PASSWORD": env.str("LEMMY_DATABASE_PASSWORD", default=None),
-        "HOST": env.str("LEMMY_DATABASE_HOST", default="lemmy-db"),
-        "PORT": env.int("LEMMY_DATABASE_PORT", default=5432),
-    },
+    "lemmy": LEMMY_DB if FEDIVERSER_ENABLE_LEMMY_INTEGRATION else DUMMY_DB,
 }
 DATABASE_ROUTERS = ("fediverser.services.base.database_router.InternalRouter",)
 
@@ -279,16 +307,3 @@ for app in INTERNAL_APPS:
         "level": LOG_LEVEL,
         "propagate": False,
     }
-
-
-# Instance-specific
-CONNECTED_LEMMY_INSTANCE_DOMAIN = env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None)
-FEDIVERSER_HUB_SITE = env.str("FEDIVERSER_HUB_SITE", default="https://fediverser.network")
-FEDIVERSER_BOT_USERNAME = env.str("FEDIVERSER_BOT_USERNAME", default=None)
-FEDIVERSER_BOT_PASSWORD = env.str("FEDIVERSER_BOT_PASSWORD", default=None)
-PORTAL_URL = env.str("FEDIVERSER_PORTAL_URL", default=None)
-SITE_NAME = env.str("FEDIVERSER_SITE_NAME", default="Fediverser Portal")
-
-
-# Wagtail
-WAGTAIL_SITE_NAME = SITE_NAME

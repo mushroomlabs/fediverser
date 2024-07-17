@@ -1,7 +1,6 @@
 {% extends "portal/generic/base.tmpl.html" %}
 {% load fediverser humanize wagtailadmin_tags %}
 
-{% lemmy_instance %}
 {% block main_content %}
 <dl>
   <dt>Community Page</dt>
@@ -109,7 +108,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
       <td>{{ submission.subreddit.name }}</td>
       <td>{{ submission.created|naturaltime }}</td>
       <td>
-        {% if submission.can_be_submitted_automatically and not submission.url|posted_to_community:object %}
+        {% if submission.can_be_submitted_automatically %}
         <a class="button text-replace button--icon"
             role="link"
             href="{% url 'fediverser-core:community-repost-reddit' name=object.name instance_domain=object.instance.domain %}?url={{ submission.url|urlencode}}">

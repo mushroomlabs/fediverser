@@ -315,6 +315,7 @@ class RedditSubmission(AbstractRedditItem):
     def can_be_submitted_automatically(self):
         return all(
             [
+                settings.FEDIVERSER_ENABLE_LEMMY_INTEGRATION,
                 not self.over_18,
                 not self.banned_at,
                 not self.quarantined,

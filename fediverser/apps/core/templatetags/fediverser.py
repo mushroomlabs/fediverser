@@ -7,10 +7,13 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.ui import sidebar
 from wagtail.telepath import JSContext, adapter
 
+from fediverser.apps.core.models.activitypub import FediversedInstance
 from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
-from fediverser.apps.lemmy.services import CommunityProxy, InstanceProxy
+from fediverser.apps.core.settings import app_settings
+from fediverser.apps.lemmy.services import CommunityProxy
+from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
 register = template.Library()
 
@@ -206,9 +209,11 @@ def latest_feed_entries(community):
 def submissions_from_related_subreddits(community):
     now = timezone.now()
     cutoff = now - RedditSubmission.MAX_AGE
-    return RedditSubmission.repostable.filter(
-        subreddit__recommendations__community=community, modified__gte=cutoff
-    ).order_by("-created")
+    qs = RedditSubmission.repostable.filter(
+        subreddit__recommendations__community=community, created__gte=cutoff
+    )
+
+    return qs.select_related("author").order_by("-created")
 
 
 @register.filter
@@ -216,25 +221,17 @@ def subreddit_counterparts(community):
     return RedditCommunity.objects.filter(recommendations__community=community)
 
 
-@register.filter
-def posted_to_community(url, community):
-    try:
-        lemmy_community = CommunityProxy.objects.get_by_fqdn(community.fqdn)
-        return lemmy_community.post_set.filter(url=url).exists()
-    except CommunityProxy.DoesNotExist:
-        return True
+@register.simple_tag
+def fediversed_lemmy():
+    domain = lemmy_settings.Instance.domain
+    return domain and FediversedInstance.objects.filter(instance__domain=domain).first()
 
 
 @register.simple_tag
-def lemmy_instance():
-    return InstanceProxy.get_connected_instance()
-
-
-@register.simple_tag
-def fediverser_hub_site():
-    return settings.FEDIVERSER_HUB_SITE
+def fediverser_portal_settings():
+    return app_settings.Portal
 
 
 @register.simple_tag
 def site_name():
-    return settings.SITE_NAME
+    return app_settings.Portal.name

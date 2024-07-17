@@ -2,12 +2,12 @@ import bcrypt
 import jwt
 import pyotp
 from Crypto.PublicKey import RSA
-from django.conf import settings
 from django.db.models import QuerySet
 from django.utils import timezone
 from pythorhead import Lemmy
 
 from . import models
+from .settings import app_settings
 
 # Normally, I'd just keep all business logic along with the models,
 # but given that the models from this application are not managed by
@@ -91,7 +91,9 @@ class InstanceProxy(models.Instance):
 
     @classmethod
     def get_connected_instance(cls):
-        return cls.objects.get(domain=settings.CONNECTED_LEMMY_INSTANCE_DOMAIN)
+        domain = app_settings.Instance.domain
+
+        return domain and cls.objects.filter(domain=domain).first()
 
     class Meta:
         proxy = True
@@ -110,6 +112,10 @@ class LocalUserProxy(models.LocalUser):
     @property
     def is_bot(self):
         return self.person.bot_account
+
+    @property
+    def instance_domain(self):
+        return self.person.instance.domain
 
     def __str__(self):
         return self.person.name
@@ -135,7 +141,7 @@ class LocalUserProxy(models.LocalUser):
         now = timezone.now()
         claims = {
             "sub": str(self.id),
-            "iss": settings.CONNECTED_LEMMY_INSTANCE_DOMAIN,
+            "iss": self.instance_domain,
             "iat": int(now.timestamp()),
         }
 
@@ -152,7 +158,7 @@ class LocalUserProxy(models.LocalUser):
         if username in LEMMY_CLIENTS:
             return LEMMY_CLIENTS[username]
 
-        domain = settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
+        domain = self.person.instance.domain
 
         lemmy_client = Lemmy(f"https://{domain}", raise_exceptions=True)
         login_token = self.make_login_token()
@@ -164,9 +170,7 @@ class LocalUserProxy(models.LocalUser):
     @classmethod
     def get_mirror_user(cls, username):
         try:
-            mirror_instance = InstanceProxy.objects.get(
-                domain=settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
-            )
+            mirror_instance = InstanceProxy.get_connected_instance()
         except InstanceProxy.DoesNotExist:
             raise ValueError("Could not find Lemmy instance")
 
@@ -176,8 +180,8 @@ class LocalUserProxy(models.LocalUser):
 
     @classmethod
     def get_fediverser_bot(cls):
-        username = settings.FEDIVERSER_BOT_USERNAME
-        password = settings.FEDIVERSER_BOT_PASSWORD
+        username = app_settings.Bot.username
+        password = app_settings.Bot.password
 
         try:
             assert username is not None, "Proxy user is not properly configured"
@@ -186,11 +190,9 @@ class LocalUserProxy(models.LocalUser):
             raise LemmyProxyUserNotConfigured(str(exc))
 
         try:
-            mirror_instance = InstanceProxy.objects.get(
-                domain=settings.CONNECTED_LEMMY_INSTANCE_DOMAIN
-            )
-        except InstanceProxy.DoesNotExist:
-            raise LemmyProxyUserNotConfigured("Lemmy Mirror instance is not properly configured")
+            mirror_instance = InstanceProxy.get_connected_instance()
+        except Exception as exc:
+            raise LemmyProxyUserNotConfigured(str(exc))
 
         proxy_user = cls.objects.filter(
             person__name=username, person__instance=mirror_instance

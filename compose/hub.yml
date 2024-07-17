@@ -1,0 +1,163 @@
+x-developer: &fediverser-development
+  user: "${UID:-1000}:${GID:-1000}"
+
+x-public-service: &public-service
+  networks:
+    - default
+    - internal
+
+x-internal-service: &internal-service
+  networks:
+    - internal
+
+x-fediverser-web-service-envvars: &fediverser-service-envvars
+  DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
+  FEDIVERSER_STATIC_ROOT: /var/fediverser/static
+  FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
+  FEDIVERSER_BROKER_URL: redis://hub-broker:6379/0
+  FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
+  FEDIVERSER_CACHE_LOCATION: redis://hub-cache:6379/0
+  FEDIVERSER_CORS_HEADERS_ENABLED: 1
+  FEDIVERSER_DATABASE_NAME: fediverser
+  FEDIVERSER_DATABASE_USER: fediverser
+  FEDIVERSER_DATABASE_PASSWORD: fediverser
+  FEDIVERSER_DATABASE_HOST: hub-db
+  FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@fediverser.example.com
+  FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+  FEDIVERSER_SECRET_KEY: base-fediverser-network-secret-key
+  FEDIVERSER_DEBUG: "true"
+  FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
+  FEDIVERSER_ENABLE_LEMMY: "false"
+  FEDIVERSER_GLOBAL_LEMMY_INSTANCE_LOCATOR: "true"
+  IPYTHONDIR: /tmp/ipython
+
+x-fediverser-dev: &fediverser-dev-service
+  <<: [*fediverser-development, *internal-service]
+  stdin_open: true
+  tty: true
+  build:
+    context: .
+    target: development
+  restart: unless-stopped
+
+  depends_on: &fediverser-service-dependencies
+    - hub-cache
+    - hub-db
+
+  environment: &fediverser-portal-envvars
+    <<: *fediverser-service-envvars
+
+  env_file:
+    - .env
+    - .env.hub.dev
+
+  volumes:
+    - ./:/app
+    - hub-static-data:/var/fediverser/static
+    - hub-media-data:/var/fediverser/media
+    - hub-ipython-dev-data:/tmp/ipython
+
+x-webapp: &fediverser-webservice
+  command: poetry run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir=/app/fediverser --reload-include *.html
+
+services:
+  hub-db:
+    <<: [*internal-service, *fediverser-development]
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fediverser
+      POSTGRES_PASSWORD: fediverser
+      POSTGRES_DB: fediverser
+    volumes:
+      - hub-postgresql-data:/var/lib/postgresql/data
+
+  hub-broker:
+    <<: [*internal-service, *fediverser-development]
+    image: redis:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - broker-data:/data
+
+  hub-cache:
+    <<: [*internal-service, *fediverser-development]
+    image: redis:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
+    volumes:
+      - cache-data:/data
+
+  hub:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+
+  hub-celery:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+    command: poetry run celery -A fediverser.services.base worker -l INFO -E
+
+  hub-celerybeat:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+    command: poetry run celery -A fediverser.services.base beat -l INFO -S django
+
+
+  hub-init_migrate_db:
+    <<: *fediverser-dev-service
+    restart: on-failure
+    command: poetry run django-admin migrate
+
+  hub-init_collect_static:
+    <<: *fediverser-dev-service
+    restart: on-failure
+    command: poetry run django-admin collectstatic --no-input
+
+volumes:
+  hub-static-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_HUB_STATIC_MOUNT_PATH?Variable not set}"
+
+  hub-media-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_HUB_MEDIA_MOUNT_PATH?Variable not set}"
+
+  hub-postgresql-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_HUB_DATABASE_MOUNT_PATH?Variable not set}"
+
+  hub-broker-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_HUB_BROKER_MOUNT_PATH?Variable not set}"
+
+
+  hub-cache-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_HUB_CACHE_MOUNT_PATH?Variable not set}"
+
+  hub-ipython-dev-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${FEDIVERSER_HUB_IPYTHON_DATA_PATH?Variable not set}"

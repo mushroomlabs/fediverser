@@ -14,6 +14,23 @@ x-internal-service: &internal-service
   networks:
     - internal
 
+x-fediverser-web-service-envvars: &fediverser-service-envvars
+  FEDIVERSER_DATABASE_NAME: fediverser
+  FEDIVERSER_DATABASE_USER: fediverser
+  FEDIVERSER_DATABASE_PASSWORD: fediverser
+  FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@fediverser.example.com
+  FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+  FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
+  FEDIVERSER_DEBUG: "true"
+  IPYTHONDIR: /tmp/ipython
+
+x-fediversed-lemmy-envvars: &fediverser-lemmy-envvars
+  LEMMY_DATABASE_HOST: lemmy-db
+  LEMMY_DATABASE_PORT: "5432"
+  LEMMY_DATABASE_NAME: lemmy
+  LEMMY_DATABASE_USER: lemmy
+  LEMMY_DATABASE_PASSWORD: lemmy
+
 x-fediverser-dev: &fediverser-dev-service
   <<: *fediverser-development
   stdin_open: true
@@ -28,23 +45,12 @@ x-fediverser-dev: &fediverser-dev-service
     - broker
     - db
 
-  environment: &fediverser_web_envvars
-    FEDIVERSER_DATABASE_NAME: fediverser
-    FEDIVERSER_DATABASE_USER: fediverser
-    FEDIVERSER_DATABASE_PASSWORD: fediverser
-    LEMMY_DATABASE_HOST: lemmy-db
-    LEMMY_DATABASE_PORT: "5432"
-    LEMMY_DATABASE_NAME: lemmy
-    LEMMY_DATABASE_USER: lemmy
-    LEMMY_DATABASE_PASSWORD: lemmy
-    FEDIVERSER_EMAIL_MAILER_ADDRESS: noreply@fediverser.example.com
-    FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
-    FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
-    FEDIVERSER_DEBUG: "true"
-    IPYTHONDIR: /tmp/ipython
+  environment: &fediverser-portal-envvars
+    <<: [*fediverser-service-envvars, *fediverser-lemmy-envvars]
 
   env_file:
     - .env
+    - .env.portal.dev
 
   volumes:
     - ./:/app
@@ -85,6 +91,14 @@ services:
 
   portal:
     <<: [*fediverser-dev-service, *fediverser-webservice]
+
+  hub:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+    environment:
+      <<: *fediverser-service-envvars
+    env_file:
+      - .env
+      - .env.hub.dev
 
   pull_reddit:
     <<: *fediverser-dev-service
@@ -217,42 +231,42 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_STATIC_MOUNT_PATH?Variable not set}"
+      device: "${FEDIVERSER_PORTAL_STATIC_MOUNT_PATH?Variable not set}"
 
   media-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_MEDIA_MOUNT_PATH?Variable not set}"
+      device: "${FEDIVERSER_PORTAL_MEDIA_MOUNT_PATH?Variable not set}"
 
   postgresql-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_DATABASE_MOUNT_PATH?Variable not set}"
+      device: "${FEDIVERSER_PORTAL_DATABASE_MOUNT_PATH?Variable not set}"
 
   broker-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_BROKER_MOUNT_PATH?Variable not set}"
+      device: "${FEDIVERSER_PORTAL_BROKER_MOUNT_PATH?Variable not set}"
 
   cache-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_CACHE_MOUNT_PATH?Variable not set}"
+      device: "${FEDIVERSER_PORTAL_CACHE_MOUNT_PATH?Variable not set}"
 
   ipython-dev-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_IPYTHON_DATA_PATH?Variable not set}"
+      device: "${FEDIVERSER_PORTAL_IPYTHON_DATA_PATH?Variable not set}"
 
   lemmy-db-data:
     driver: local
