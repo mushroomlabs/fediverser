@@ -190,6 +190,9 @@ def is_ambassador(user, community):
 
 @register.filter
 def has_pending_ambassador_application(user, community):
+    if not user.is_authenticated:
+        return False
+
     return community.ambassador_applications.filter(
         requester=user, status=ChangeRequest.STATUS.requested
     ).exists()
