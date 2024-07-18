@@ -11,6 +11,7 @@ _SETTINGS_KEY = "FEDIVERSED_LEMMY"
 class AppSettings:
     class Instance:
         domain = None
+        reddit_mirror_bots_enabled = False
 
     class Bot:
         username = None
@@ -22,6 +23,7 @@ class AppSettings:
     def load(self):
         ATTRS = {
             "INSTANCE_DOMAIN": (self.Instance, "domain"),
+            "REDDIT_MIRROR_BOTS_ENABLED": (self.Instance, "reddit_mirror_bots_enabled"),
             "BOT_USERNAME": (self.Bot, "username"),
             "BOT_PASSWORD": (self.Bot, "password"),
         }

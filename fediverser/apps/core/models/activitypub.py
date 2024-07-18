@@ -70,8 +70,10 @@ class FediversedInstance(models.Model):
     instance = models.OneToOneField(
         Instance, related_name="fediverser_configuration", on_delete=models.CASCADE
     )
+    portal_url = models.URLField(null=True, blank=True)
     allows_reddit_signup = models.BooleanField(default=True)
     allows_reddit_mirrored_content = models.BooleanField(default=False)
+    creates_reddit_mirror_bots = models.BooleanField(default=False)
     accepts_community_requests = models.BooleanField(
         default=False, help_text="Accepts Community Requests"
     )
@@ -148,4 +150,4 @@ class Person(models.Model, ActorMixin):
         return f"https://{self.instance.domain}/u/{self.name}"
 
 
-__all__ = ("Instance", "Community", "Person")
+__all__ = ("Instance", "Community", "Person", "FediversedInstance")

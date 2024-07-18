@@ -3,6 +3,26 @@ from rest_framework import serializers
 from . import models
 
 
+class InstanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Instance
+        fields = read_only_fields = ("domain", "software")
+
+
+class FediversedInstanceSerializer(serializers.ModelSerializer):
+    instance = InstanceSerializer()
+
+    class Meta:
+        model = models.FediversedInstance
+        fields = read_only_fields = (
+            "instance",
+            "portal_url",
+            "allows_reddit_mirrored_content",
+            "allows_reddit_signup",
+            "accepts_community_requests",
+        )
+
+
 class CommunitySerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Community
@@ -53,3 +73,9 @@ class CommunityRequestSerializer(serializers.ModelSerializer):
             "header_image_url",
             "logo_image_url",
         )
+
+
+class NodeInfoSerializer(serializers.Serializer):
+    url = serializers.URLField()
+    registration_methods = serializers.ListField(child=serializers.CharField())
+    lemmy = FediversedInstanceSerializer()

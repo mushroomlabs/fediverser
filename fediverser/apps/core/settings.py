@@ -18,11 +18,23 @@ class AppSettings:
         default_hub_url = "https://fediverser.network"
         signup_with_reddit = True
         global_lemmy_instance_selector = False
+        accepts_community_requests = False
 
     class Reddit:
         mirroring_enabled = False
         bot_username = None
         bot_password = None
+
+    @property
+    def registration_methods(self):
+        methods = []
+        if self.Portal.open_registrations:
+            methods.append("direct")
+
+        if self.Portal.signup_with_reddit:
+            methods.append("reddit")
+
+        return methods
 
     @property
     def oauth_reddit_application_name(self):
@@ -48,6 +60,7 @@ class AppSettings:
             "URL": (self.Portal, "url"),
             "NAME": (self.Portal, "name"),
             "HUB_URL": (self.Portal, "default_hub_url"),
+            "ACCEPTS_COMMUNITY_REQUESTS": (self.Portal, "accepts_community_requests"),
             "GLOBAL_LEMMY_INSTANCE_LOCATOR": (self.Portal, "global_lemmy_instance_selector"),
             "REDDIT_SIGNUP_ENABLED": (self.Portal, "signup_with_reddit"),
             "REDDIT_MIRRORING_ENABLED": (self.Reddit, "mirroring_enabled"),

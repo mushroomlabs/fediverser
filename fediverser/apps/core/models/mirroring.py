@@ -6,7 +6,6 @@ import tempfile
 from urllib.parse import urlencode
 
 import requests
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.template.loader import render_to_string
@@ -23,6 +22,7 @@ from fediverser.apps.lemmy.services import (
 )
 
 from ..choices import AutomaticCommentPolicies, AutomaticSubmissionPolicies
+from ..settings import app_settings
 from .activitypub import Community
 from .reddit import RedditComment, RedditCommunity, RedditSubmission, RejectedComment, RejectedPost
 
@@ -133,7 +133,7 @@ class LemmyMirroredPost(TimeStampedModel):
                 {
                     "mirrored_post": self,
                     "mirror_instance": lemmy_mirror,
-                    "portal_url": settings.PORTAL_URL,
+                    "portal_url": app_settings.Portal.url,
                 },
             )
             params = dict(post_id=self.lemmy_post_id, content=body)

@@ -84,4 +84,5 @@ urlpatterns = [
         views.RedditCommunityListView.as_view(),
         name="api-subreddit-list",
     ),
+    path("api/nodeinfo", views.NodeInfoView.as_view(), name="nodeinfo-detail"),
 ]
