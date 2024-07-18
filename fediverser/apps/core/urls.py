@@ -85,4 +85,9 @@ urlpatterns = [
         name="api-subreddit-list",
     ),
     path("api/nodeinfo", views.NodeInfoView.as_view(), name="nodeinfo-detail"),
+    path(
+        "api/fediverser-instances",
+        views.FediversedInstanceListView.as_view(),
+        name="fediverserinstance-list",
+    ),
 ]

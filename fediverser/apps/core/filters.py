@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django_filters import rest_framework as filters
 
 from . import models
@@ -45,4 +46,30 @@ class RedditCommunityFilter(filters.FilterSet):
             "category",
             "over18",
             "locked",
+        )
+
+
+class FediversedInstanceFilter(filters.FilterSet):
+    search = filters.CharFilter(label="search", method="instance_search")
+    trusted = filters.BooleanFilter(label="trusted", method="trusted_by_us")
+
+    def instance_search(self, queryset, name, value):
+        instance_domain_q = Q(instance__domain__icontains=value)
+        portal_q = Q(portal_url__icontains=value)
+        return queryset.filter(instance_domain_q | portal_q)
+
+    def trusted_by_us(self, queryset, name, value):
+        action = queryset.filter if value else queryset.exclude
+        us = models.FediversedInstance.current()
+        return action(endorsed_instances__endorser=us)
+
+    class Meta:
+        model = models.FediversedInstance
+        fields = (
+            "search",
+            "trusted",
+            "accepts_community_requests",
+            "allows_reddit_mirrored_content",
+            "allows_reddit_signup",
+            "creates_reddit_mirror_bots",
         )

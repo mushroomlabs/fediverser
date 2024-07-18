@@ -1,5 +1,4 @@
 import os
-from shutil import which
 
 import environ
 
@@ -38,7 +37,7 @@ THIRD_PARTY_APPS = (
     "django_celery_results",
     "django_extensions",
     "django_filters",
-    "compressor",
+    "drf_link_header_pagination",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -244,16 +243,11 @@ USE_TZ = True
 STATICFILES_FINDERS = (
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    "compressor.finders.CompressorFinder",
 )
 
 
-COMPRESS_ENABLED = True
-COMPRESS_PRECOMPILERS = (("text/x-sass", "{} {{infile}} {{outfile}}".format(which("pysassc"))),)
-COMPRESS_CSS_FILTERS = ["compressor.filters.css_default.CssAbsoluteFilter"]
-
-COMPRESS_URL = STATIC_URL = env.str("FEDIVERSER_STATIC_URL", default="/static/")
-COMPRESS_ROOT = STATIC_ROOT = env.str(
+STATIC_URL = env.str("FEDIVERSER_STATIC_URL", default="/static/")
+STATIC_ROOT = env.str(
     "FEDIVERSER_STATIC_ROOT", default=os.path.abspath(os.path.join(BASE_DIR, "static"))
 )
 MEDIA_ROOT = os.getenv("FEDIVERSER_MEDIA_ROOT", os.path.abspath(os.path.join(BASE_DIR, "media")))
@@ -261,9 +255,16 @@ MEDIA_URL = os.getenv("FEDIVERSER_MEDIA_URL", "/media/")
 
 
 # Rest Framework
+REST_RENDERERS = ("BrowsableAPIRenderer", "JSONRenderer") if DEBUG else ("JSONRenderer",)
 REST_FRAMEWORK = {
-    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend"),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.OrderingFilter",
+    ),
+    "DEFAULT_RENDERER_CLASSES": [
+        f"rest_framework.renderers.{renderer}" for renderer in REST_RENDERERS
+    ],
+    "DEFAULT_PAGINATION_CLASS": "drf_link_header_pagination.LinkHeaderPagination",
     "PAGE_SIZE": 100,
 }
 

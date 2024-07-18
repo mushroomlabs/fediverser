@@ -1,55 +1,27 @@
+from rest_framework import generics
 from rest_framework.permissions import AllowAny
-from rest_framework.renderers import JSONRenderer
-from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from fediverser.apps.core.models import FediversedInstance, Instance
-from fediverser.apps.core.models.common import AP_SERVER_SOFTWARE, INSTANCE_STATUSES
-from fediverser.apps.core.settings import app_settings
-from fediverser.apps.lemmy.services import InstanceProxy
-from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
+from fediverser.apps.core.models import FediversedInstance
 
-from ..serializers import NodeInfoSerializer
-
-NODE_CONFIGURATION = {
-    "portal_url": app_settings.Portal.url,
-    "accepts_community_requests": app_settings.Portal.accepts_community_requests,
-    "allows_reddit_signup": app_settings.Portal.signup_with_reddit,
-    "allows_reddit_mirrored_content": lemmy_settings.Instance.reddit_mirror_bots_enabled,
-    "creates_reddit_mirror_bots": app_settings.Reddit.mirroring_enabled,
-}
+from ..filters import FediversedInstanceFilter
+from ..serializers import FediversedInstanceSerializer
 
 
-class NodeInfoView(APIView):
+class NodeInfoView(generics.RetrieveAPIView):
     permission_classes = (AllowAny,)
-    renderer_classes = (JSONRenderer,)
+    serializer_class = FediversedInstanceSerializer
 
-    def get(self, request, *args, **kw):
-        lemmy_instance = InstanceProxy.get_connected_instance()
-
-        if lemmy_instance is not None:
-            instance, _ = Instance.objects.get_or_create(
-                domain=lemmy_instance.domain,
-                defaults={
-                    "software": AP_SERVER_SOFTWARE.lemmy,
-                    "status": INSTANCE_STATUSES.active,
-                },
-            )
-            fediversed_instance, _ = FediversedInstance.objects.update_or_create(
-                instance=instance,
-                defaults=NODE_CONFIGURATION,
-            )
-        else:
-            fediversed_instance = None
-
-        serializer = NodeInfoSerializer(
-            {
-                "url": app_settings.Portal.url,
-                "registration_methods": app_settings.registration_methods,
-                "lemmy": fediversed_instance,
-            }
-        )
-        return Response(serializer.data)
+    def get_object(self, *args, **kw):
+        return FediversedInstance.current()
 
 
-__all__ = ("NodeInfoView",)
+class FediversedInstanceListView(generics.ListCreateAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = FediversedInstanceSerializer
+    filterset_class = FediversedInstanceFilter
+
+    def get_queryset(self):
+        return FediversedInstance.objects.all()
+
+
+__all__ = ("NodeInfoView", "FediversedInstanceListView")

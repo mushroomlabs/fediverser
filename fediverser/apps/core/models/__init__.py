@@ -5,4 +5,5 @@ from .feeds import *  # noqa
 from .invites import *  # noqa
 from .mapping import *  # noqa
 from .mirroring import *  # noqa
+from .network import *  # noqa
 from .reddit import *  # noqa

@@ -1,6 +1,7 @@
 import os
 import uuid
 
+import cloudscraper
 from django.db import models
 from django.utils.deconstruct import deconstructible
 from model_utils import Choices
@@ -27,6 +28,12 @@ AP_SERVER_SOFTWARE = Choices(
     ("mbin", "Mbin"),
     ("mastodon", "Mastodon"),
 )
+
+
+def make_http_client():
+    return cloudscraper.create_scraper(
+        browser={"browser": "firefox", "platform": "linux", "mobile": False}
+    )
 
 
 @deconstructible

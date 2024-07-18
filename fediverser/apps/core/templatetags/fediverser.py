@@ -6,9 +6,9 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.ui import sidebar
 from wagtail.telepath import JSContext, adapter
 
-from fediverser.apps.core.models.activitypub import FediversedInstance
 from fediverser.apps.core.models.feeds import Entry
 from fediverser.apps.core.models.mapping import ChangeRequest
+from fediverser.apps.core.models.network import FediversedInstance
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
 from fediverser.apps.core.settings import app_settings
 from fediverser.apps.lemmy.settings import app_settings as lemmy_settings

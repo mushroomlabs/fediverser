@@ -6,11 +6,12 @@ from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
 from . import tasks
 from .models.accounts import UserAccount
-from .models.activitypub import Community, FediversedInstance, Instance
+from .models.activitypub import Community, Instance
 from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
 from .models.mapping import Category, ChangeRequest
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
+from .models.network import FediversedInstance
 from .models.reddit import (
     RedditAccount,
     RedditComment,
@@ -121,6 +122,7 @@ class InstanceAdmin(admin.ModelAdmin):
 @admin.register(FediversedInstance)
 class FediversedInstanceAdmin(admin.ModelAdmin):
     list_display = (
+        "portal_url",
         "instance",
         "allows_reddit_signup",
         "allows_reddit_mirrored_content",
@@ -132,7 +134,21 @@ class FediversedInstanceAdmin(admin.ModelAdmin):
         "accepts_community_requests",
     )
     list_select_related = ("instance",)
-    search_fields = ("instance__domain",)
+    search_fields = (
+        "portal_url",
+        "instance__domain",
+    )
+    actions = ("submit_registration",)
+
+    @admin.action(description="register own instance on selected instances")
+    def submit_registration(self, request, queryset):
+        own_instance = FediversedInstance.current()
+        for instance in queryset:
+            try:
+                own_instance.submit_registration(instance)
+                messages.success(request, f"Registered at {instance.portal_url}")
+            except Exception as exc:
+                messages.error(request, f"Failed to register at {instance.portal_url}: {exc}")
 
     def has_change_permission(self, request, obj=None):
         return obj is None or obj.instance.domain == lemmy_settings.Instance.domain

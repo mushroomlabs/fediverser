@@ -7,7 +7,6 @@ from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics
-from wagtail.snippets.views.snippets import SnippetViewSet
 
 from .. import forms, models, serializers
 from ..filters import ChangeRequestFilter, CommunityFilter, InstanceFilter, RedditCommunityFilter
@@ -322,29 +321,6 @@ class CommunityFeedCreateView(CreateView):
         community_feed = form.save()
         self.request.user.account.community_feeds.add(community_feed)
         return HttpResponseRedirect(self.get_success_url())
-
-
-class SubredditViewSet(SnippetViewSet):
-    model = models.RedditCommunity
-    icon = "list-ul"
-    add_to_admin_menu = True
-    list_display = ("name", "description", "category", "over18")
-    list_filter = ("category", "over18")
-    search_fields = ("name",)
-
-
-class CommunityViewSet(SnippetViewSet):
-    model = models.Community
-    icon = "group"
-    add_to_admin_menu = True
-    list_filter = ("category", "status")
-    list_display = ("name", "instance", "category")
-
-
-class InstanceViewSet(SnippetViewSet):
-    model = models.Instance
-    list_filter = ("category", "status")
-    add_to_admin_menu = True
 
 
 @csrf_exempt

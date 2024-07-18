@@ -6,17 +6,33 @@ from . import models
 class InstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Instance
-        fields = read_only_fields = ("domain", "software")
+        fields = read_only_fields = ("url", "software")
 
 
 class FediversedInstanceSerializer(serializers.ModelSerializer):
-    instance = InstanceSerializer()
+    instance = InstanceSerializer(read_only=True)
+
+    def validate(self, attrs):
+        url = attrs["portal_url"]
+        if self.Meta.model.objects.filter(portal_url=url).exists():
+            raise serializers.ValidationError(f"{url} is already registered")
+        return attrs
+
+    def create(self, validated_data):
+        url = validated_data["portal_url"]
+        return self.Meta.model.fetch(url)
 
     class Meta:
         model = models.FediversedInstance
-        fields = read_only_fields = (
+        fields = (
             "instance",
             "portal_url",
+            "allows_reddit_mirrored_content",
+            "allows_reddit_signup",
+            "accepts_community_requests",
+        )
+        read_only_fields = (
+            "instance",
             "allows_reddit_mirrored_content",
             "allows_reddit_signup",
             "accepts_community_requests",
@@ -73,9 +89,3 @@ class CommunityRequestSerializer(serializers.ModelSerializer):
             "header_image_url",
             "logo_image_url",
         )
-
-
-class NodeInfoSerializer(serializers.Serializer):
-    url = serializers.URLField()
-    registration_methods = serializers.ListField(child=serializers.CharField())
-    lemmy = FediversedInstanceSerializer()

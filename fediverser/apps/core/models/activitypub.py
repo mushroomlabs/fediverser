@@ -1,7 +1,6 @@
 import logging
 from urllib.parse import urlparse
 
-import cloudscraper
 from django.db import models
 from pythorhead.types import LanguageType
 from taggit.managers import TaggableManager
@@ -9,7 +8,7 @@ from taggit.managers import TaggableManager
 from fediverser.apps.lemmy.models import Community as LemmyCommunity, Language
 from fediverser.apps.lemmy.services import InstanceProxy
 
-from .common import AP_SERVER_SOFTWARE, INSTANCE_STATUSES, Category
+from .common import AP_SERVER_SOFTWARE, INSTANCE_STATUSES, Category, make_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +17,9 @@ AP_CLIENT_REQUEST_HEADERS = {"Accept": "application/ld+json"}
 
 
 def make_ap_client():
-    scraper = cloudscraper.create_scraper(
-        browser={"browser": "firefox", "platform": "linux", "mobile": False}
-    )
-    scraper.headers.update(**AP_CLIENT_REQUEST_HEADERS)
-    return scraper
+    client = make_http_client()
+    client.headers.update(**AP_CLIENT_REQUEST_HEADERS)
+    return client
 
 
 class Instance(models.Model):
@@ -56,27 +53,30 @@ class Instance(models.Model):
     @classmethod
     def get_software_info(cls, url):
         domain = urlparse(url).hostname
-        full_url = f"https://{domain}/nodeinfo/2.0.json"
         scraper = make_ap_client()
+
+        nodeinfo_url = f"https://{domain}/.well-known/nodeinfo"
+        nodeinfo_response = scraper.get(nodeinfo_url)
+        nodeinfo_response.raise_for_status()
+        nodeinfo_data = nodeinfo_response.json()
+
+        full_url = nodeinfo_data["links"][0]["href"]
         response = scraper.get(full_url)
         response.raise_for_status()
         return response.json()
 
+    @classmethod
+    def fetch(cls, url):
+        domain = urlparse(url).hostname
+        software_info = cls.get_software_info(url)
+
+        instance, _ = cls.objects.update_or_create(
+            domain=domain, defaults={"software": software_info["software"]["name"]}
+        )
+        return instance
+
     def __str__(self):
         return self.domain
-
-
-class FediversedInstance(models.Model):
-    instance = models.OneToOneField(
-        Instance, related_name="fediverser_configuration", on_delete=models.CASCADE
-    )
-    portal_url = models.URLField(null=True, blank=True)
-    allows_reddit_signup = models.BooleanField(default=True)
-    allows_reddit_mirrored_content = models.BooleanField(default=False)
-    creates_reddit_mirror_bots = models.BooleanField(default=False)
-    accepts_community_requests = models.BooleanField(
-        default=False, help_text="Accepts Community Requests"
-    )
 
 
 class ActorMixin:
@@ -110,7 +110,10 @@ class Community(models.Model, ActorMixin):
 
     @property
     def url(self):
-        return f"https://{self.instance.domain}/c/{self.name}"
+        return {
+            AP_SERVER_SOFTWARE.lemmy: f"https://{self.instance.domain}/c/{self.name}",
+            AP_SERVER_SOFTWARE.kbin: f"https://{self.instance.domain}/m/{self.name}",
+        }.get(self.instance.software)
 
     @property
     def languages(self):
@@ -150,4 +153,4 @@ class Person(models.Model, ActorMixin):
         return f"https://{self.instance.domain}/u/{self.name}"
 
 
-__all__ = ("Instance", "Community", "Person", "FediversedInstance")
+__all__ = ("Instance", "Community", "Person")
