@@ -30,7 +30,7 @@ def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
 
 
 @receiver(post_save, sender=SocialAccount)
-def on_reddit_user_login_attempt_lemmy_(sender, **kw):
+def on_reddit_user_login_setup_accounts(sender, **kw):
     social_account = kw["instance"]
 
     if kw["created"] and social_account.provider == RedditProvider.id:
@@ -46,6 +46,10 @@ def on_reddit_user_login_attempt_lemmy_(sender, **kw):
             )
         except IntegrityError:
             logger.warning("User already is associated with different reddit account")
+            return
+
+        if not app_settings.provides_automatic_lemmy_onboarding:
+            logger.info("Skip lemmy user registration")
             return
 
         if user_account.lemmy_local_user is not None:

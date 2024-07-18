@@ -52,6 +52,10 @@ class AppSettings:
         )
         return app
 
+    @property
+    def provides_automatic_lemmy_onboarding(self):
+        return settings.FEDIVERSER_ENABLE_LEMMY_INTEGRATION
+
     def __init__(self):
         self.load()
 
