@@ -11,7 +11,7 @@ x-fediverser-service: &fediverser-service
 
   environment: &fediverser-service-environment
     DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
-    FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
+    FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
     FEDIVERSER_STATIC_ROOT: /var/fediverser/static
     FEDIVERSER_MEDIA_ROOT: /var/fediverser/media
     FEDIVERSER_BROKER_URL: redis://broker:6379/0
@@ -54,12 +54,12 @@ services:
 
   admin:
     <<: *fediverser-service
+    environment:
+      <<: *fediverser-service-environment
+      FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
 
   portal:
     <<: *fediverser-service
-    environment:
-      <<: *fediverser-service-environment
-      FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
 
   pull_reddit:
     <<: *fediverser-service
@@ -88,8 +88,6 @@ services:
   init_collect_static:
     <<: *fediverser-service
     command: poetry run django-admin collectstatic --no-input
-
-
 
 networks:
   internal:

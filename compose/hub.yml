@@ -99,6 +99,15 @@ services:
   hub:
     <<: [*fediverser-dev-service, *fediverser-webservice]
 
+  hub-admin:
+    <<: [*fediverser-dev-service, *fediverser-webservice]
+    environment:
+      <<: *fediverser-service-envvars
+      FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
+
+    ports:
+      - "8001:80"
+
   hub-celery:
     <<: [*fediverser-dev-service, *fediverser-webservice]
     command: poetry run celery -A fediverser.services.base worker -l INFO -E
