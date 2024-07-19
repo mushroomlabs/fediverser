@@ -12,10 +12,19 @@ from django.dispatch import receiver
 from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 
 from .models.accounts import UserAccount
+from .models.activitypub import Instance, Person
 from .models.feeds import Feed
+from .models.mapping import RedditToCommunityRecommendation
 from .models.mirroring import LemmyMirroredPost
+from .models.network import (
+    ConnectedRedditAccount,
+    ConnectedRedditAccountEntry,
+    FediversedInstance,
+    RedditToCommunityRecommendationEntry,
+)
 from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
 from .settings import app_settings
+from .signals import redditor_migrated
 from .tasks import fetch_feed, post_mirror_disclosure, subscribe_to_community
 
 logger = logging.getLogger(__name__)
@@ -58,19 +67,27 @@ def on_reddit_user_login_setup_accounts(sender, **kw):
 
         homonym = LocalUserProxy.objects.filter(person__name__iexact=reddit_username).first()
 
-        if homonym is None:
-            lemmy_instance = InstanceProxy.get_connected_instance()
-            lemmy_instance.register(reddit_username, as_bot=False)
-            user_account.lemmy_local_username = reddit_username
-            user_account.save()
-
-        elif homonym.is_bot:
-            lemmy_instance = InstanceProxy.get_connected_instance()
-            lemmy_instance.unbot(reddit_username)
-            user_account.lemmy_local_username = reddit_username
-            user_account.save()
-        else:
+        if homonym is not None and not homonym.is_bot:
             logger.info("Not creating account on Lemmy because username is taken")
+
+        lemmy_instance = InstanceProxy.get_connected_instance()
+
+        if homonym is None:
+            lemmy_instance.register(reddit_username, as_bot=False)
+
+        if homonym.is_bot:
+            lemmy_instance.unbot(reddit_username)
+
+        user_account.lemmy_local_username = reddit_username
+        user_account.save()
+
+        instance, _ = Instance.objects.get_or_create(domain=lemmy_instance.domain)
+        person, _ = Person.objects.get_or_create(instance=instance, name=reddit_username)
+
+        ConnectedRedditAccount.objects.get_or_create(reddit_account=reddit_account, actor=person)
+        redditor_migrated.send_robust(
+            sender=ConnectedRedditAccount, reddit_account=reddit_account, activitypub_actor=person
+        )
 
 
 @receiver(pre_social_login)
@@ -136,3 +153,24 @@ def on_feed_created_fetch_entries(sender, **kw):
     if kw["created"]:
         feed = kw["instance"]
         fetch_feed.delay(feed_url=feed.url)
+
+
+@receiver(post_save, sender=RedditToCommunityRecommendation)
+def on_recommendation_created_publish_change_feed_entry(sender, **kw):
+    if kw["created"]:
+        recommendation = kw["instance"]
+        RedditToCommunityRecommendationEntry.objects.create(
+            published_by=FediversedInstance.current(), recommendation=recommendation
+        )
+
+
+@receiver(redditor_migrated, sender=ConnectedRedditAccount)
+def on_migrated_reddit_account_publish_entry(sender, **kw):
+    our_instance = FediversedInstance.current()
+    reddit_account = kw["reddit_account"]
+    actor = kw["activitypub_actor"]
+
+    connection, _ = ConnectedRedditAccount.objects.get_or_create(
+        reddit_account=reddit_account, actor=actor
+    )
+    ConnectedRedditAccountEntry.objects.create(published_by=our_instance, connection=connection)

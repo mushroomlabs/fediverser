@@ -23,6 +23,9 @@ class RedditToCommunityRecommendation(models.Model):
         Community, related_name="recommendations", on_delete=models.CASCADE
     )
 
+    def __str__(self):
+        return f"Recommendation of {self.community} as alternative to {self.subreddit}"
+
     class Meta:
         unique_together = ("subreddit", "community")
 

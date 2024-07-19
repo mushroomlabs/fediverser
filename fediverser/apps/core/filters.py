@@ -49,6 +49,15 @@ class RedditCommunityFilter(filters.FilterSet):
         )
 
 
+class ChangeFeedFilter(filters.FilterSet):
+    since = filters.DateTimeFilter(label="since", field_name="created", lookup_expr="gte")
+    until = filters.DateTimeFilter(label="until", field_name="created", lookup_expr="lte")
+
+    class Meta:
+        model = models.ChangeFeedEntry
+        fields = ("since", "until")
+
+
 class FediversedInstanceFilter(filters.FilterSet):
     search = filters.CharFilter(label="search", method="instance_search")
     trusted = filters.BooleanFilter(label="trusted", method="trusted_by_us")

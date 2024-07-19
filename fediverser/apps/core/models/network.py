@@ -11,6 +11,7 @@ from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
 from .activitypub import Instance, Person
 from .common import make_http_client
+from .mapping import RedditToCommunityRecommendation
 from .reddit import RedditAccount
 
 
@@ -45,6 +46,9 @@ class FediversedInstance(models.Model):
             raise ValueError("Attempt to add endorsement to itself")
 
         endorsement, _ = Endorsement.objects.get_or_create(endorser=self, endorsed=partner)
+        entry, _ = EndorsementEntry.objects.get_or_create(
+            endorsement=endorsement, published_by=self
+        )
         return endorsement
 
     @property
@@ -128,8 +132,12 @@ class ConnectedRedditAccount(models.Model):
         Person, related_name="connected_reddit_accounts", on_delete=models.CASCADE
     )
 
+    class Meta:
+        unique_together = ("reddit_account", "actor")
+
 
 class ChangeFeedEntry(TimeStampedModel):
+    TYPE = None
     published_by = models.ForeignKey(
         FediversedInstance, related_name="published_feed_entries", on_delete=models.CASCADE
     )
@@ -137,27 +145,38 @@ class ChangeFeedEntry(TimeStampedModel):
 
     @property
     def description(self):
-        return f"Change #{self.id}"
+        return f"Change #{self.id}:"
 
 
 class ConnectedRedditAccountEntry(ChangeFeedEntry):
+    TYPE = "connection:reddit"
     connection = models.ForeignKey(
         ConnectedRedditAccount, related_name="feed_entries", on_delete=models.CASCADE
     )
 
     @property
     def description(self):
-        return f"{self.connection.reddit_account} is on the Fediverse at {self.actor.url}"
+        actor_url = self.connection.actor.url
+        return f"{self.connection.reddit_account} connected as {actor_url}"
 
 
 class EndorsementEntry(ChangeFeedEntry):
-    endorsemement = models.ForeignKey(
+    TYPE = "endorsement"
+    endorsement = models.ForeignKey(
         Endorsement, related_name="feed_entries", on_delete=models.CASCADE
     )
 
     @property
     def description(self):
-        return f"{self.connection.reddit_account} is on the Fediverse at {self.actor.url}"
+        return f"{self.endorsement.endorser} endorses {self.endorsement.endorsed}"
+
+
+class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
+    TYPE = "recommendation:group"
+
+    recommendation = models.ForeignKey(
+        RedditToCommunityRecommendation, related_name="feed_entries", on_delete=models.CASCADE
+    )
 
 
 __all__ = (
@@ -167,4 +186,5 @@ __all__ = (
     "ChangeFeedEntry",
     "EndorsementEntry",
     "ConnectedRedditAccountEntry",
+    "RedditToCommunityRecommendationEntry",
 )

@@ -8,7 +8,7 @@ from .models.accounts import UserAccount
 from .models.activitypub import Community, Instance
 from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
-from .models.mapping import Category, ChangeRequest
+from .models.mapping import Category, ChangeRequest, RedditToCommunityRecommendation
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
 from .models.network import FediversedInstance
 from .models.reddit import (
@@ -222,6 +222,13 @@ class RedditCommunityAdmin(admin.ModelAdmin):
     def get_metadata(self, request, queryset):
         for subreddit in queryset:
             subreddit.get_metadata()
+
+
+@admin.register(RedditToCommunityRecommendation)
+class RedditToCommunityRecommendationAdmin(admin.ModelAdmin):
+    list_display = ("subreddit", "community")
+    list_select_related = ("subreddit", "community")
+    search_fields = ("subreddit__name", "community__name", "community__instance__domain")
 
 
 @admin.register(RedditAccount)

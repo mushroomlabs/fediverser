@@ -1,11 +1,23 @@
-from rest_framework import serializers
+from collections.abc import Mapping
 
-from . import models
+from rest_framework import serializers
+from rest_polymorphic.serializers import PolymorphicSerializer
+
+from .models.activitypub import Community, Instance
+from .models.mapping import CommunityRequest
+from .models.network import (
+    ChangeFeedEntry,
+    ConnectedRedditAccountEntry,
+    EndorsementEntry,
+    FediversedInstance,
+    RedditToCommunityRecommendationEntry,
+)
+from .models.reddit import RedditCommunity
 
 
 class InstanceSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.Instance
+        model = Instance
         fields = read_only_fields = ("url", "software")
 
 
@@ -23,7 +35,7 @@ class FediversedInstanceSerializer(serializers.ModelSerializer):
         return self.Meta.model.fetch(url)
 
     class Meta:
-        model = models.FediversedInstance
+        model = FediversedInstance
         fields = (
             "instance",
             "portal_url",
@@ -41,7 +53,7 @@ class FediversedInstanceSerializer(serializers.ModelSerializer):
 
 class CommunitySerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.Community
+        model = Community
         fields = ("name", "instance", "category", "url", "fqdn")
 
 
@@ -55,7 +67,7 @@ class RedditCommunitySerializer(serializers.ModelSerializer):
         return obj.get_status_display()
 
     class Meta:
-        model = models.RedditCommunity
+        model = RedditCommunity
         read_only_fields = fields = (
             "id",
             "name",
@@ -80,7 +92,7 @@ class CommunityRequestSerializer(serializers.ModelSerializer):
     logo_image_url = serializers.URLField(source="subreddit.logo_image_url", read_only=True)
 
     class Meta:
-        model = models.CommunityRequest
+        model = CommunityRequest
         fields = read_only_fields = (
             "instance",
             "subreddit",
@@ -89,3 +101,69 @@ class CommunityRequestSerializer(serializers.ModelSerializer):
             "header_image_url",
             "logo_image_url",
         )
+
+
+class ChangeFeedEntrySerializer(serializers.HyperlinkedModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="fediverser-core:changefeedentry-detail")
+    type = serializers.SerializerMethodField()
+
+    def get_type(self, obj):
+        return obj.TYPE
+
+    class Meta:
+        model = ChangeFeedEntry
+        fields = read_only_fields = ("url", "description", "type", "created")
+
+
+class ConnectedRedditAccountEntrySerializer(ChangeFeedEntrySerializer):
+    reddit_account = serializers.CharField(source="connection.reddit_account.username")
+    actor = serializers.CharField(source="connection.actor.url")
+
+    class Meta:
+        model = ConnectedRedditAccountEntry
+        fields = read_only_fields = ChangeFeedEntrySerializer.Meta.fields + (
+            "reddit_account",
+            "actor",
+        )
+
+
+class EndorsementEntrySerializer(ChangeFeedEntrySerializer):
+    endorser = serializers.CharField(source="endorsement.endorser.portal_url")
+    endorsed = serializers.CharField(source="endorsement.endorsed.portal_url")
+
+    class Meta:
+        model = ConnectedRedditAccountEntry
+        fields = read_only_fields = ChangeFeedEntrySerializer.Meta.fields + (
+            "endorser",
+            "endorsed",
+        )
+
+
+class RedditToCommunityRecommendationEntrySerializer(ChangeFeedEntrySerializer):
+    subreddit = serializers.CharField(source="recommendation.subreddit.name")
+    community = serializers.CharField(source="recommendation.community.url")
+
+    class Meta:
+        model = RedditToCommunityRecommendationEntry
+        fields = read_only_fields = ChangeFeedEntrySerializer.Meta.fields + (
+            "subreddit",
+            "community",
+        )
+
+
+class PolymorphicChangeFeedEntrySerializer(PolymorphicSerializer):
+    model_serializer_mapping = {
+        ConnectedRedditAccountEntry: ConnectedRedditAccountEntrySerializer,
+        EndorsementEntry: EndorsementEntrySerializer,
+        RedditToCommunityRecommendationEntry: RedditToCommunityRecommendationEntrySerializer,
+    }
+
+    def to_representation(self, instance):
+        if isinstance(instance, Mapping):
+            resource_type = self._get_resource_type_from_mapping(instance)
+            serializer = self._get_serializer_from_resource_type(resource_type)
+        else:
+            resource_type = self.to_resource_type(instance)
+            serializer = self._get_serializer_from_model_or_instance(instance)
+
+        return serializer.to_representation(instance)

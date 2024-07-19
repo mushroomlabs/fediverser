@@ -714,6 +714,20 @@ Django = "*"
 testing = ["django-modelcluster"]
 
 [[package]]
+name = "django-polymorphic"
+version = "3.1.0"
+description = "Seamless polymorphic inheritance for Django models"
+optional = false
+python-versions = "*"
+files = [
+    {file = "django-polymorphic-3.1.0.tar.gz", hash = "sha256:d6955b5308bf6e41dcb22ba7c96f00b51dfa497a8a5ab1e9c06c7951bf417bf8"},
+    {file = "django_polymorphic-3.1.0-py3-none-any.whl", hash = "sha256:08bc4f4f4a773a19b2deced5a56deddd1ef56ebd15207bf4052e2901c25ef57e"},
+]
+
+[package.dependencies]
+Django = ">=2.1"
+
+[[package]]
 name = "django-redis"
 version = "5.4.0"
 description = "Full featured redis cache backend for Django."
@@ -743,6 +757,23 @@ files = [
 
 [package.dependencies]
 djangorestframework = "*"
+
+[[package]]
+name = "django-rest-polymorphic"
+version = "0.1.10"
+description = "Polymorphic serializers for Django REST Framework."
+optional = false
+python-versions = "*"
+files = [
+    {file = "django-rest-polymorphic-0.1.10.tar.gz", hash = "sha256:2960f58ed9a8bb0d42bc72c8ffaadfbd7f37d2573d42a1cd9a6460f3d572b519"},
+    {file = "django_rest_polymorphic-0.1.10-py2.py3-none-any.whl", hash = "sha256:f3980e3e2af73357e7913f9b1410ef856866bcfcc46903b70fe9621118bb538c"},
+]
+
+[package.dependencies]
+django = "*"
+django-polymorphic = "*"
+djangorestframework = "*"
+six = "*"
 
 [[package]]
 name = "django-taggit"
@@ -2655,4 +2686,4 @@ wand = ["Wand (>=0.6,<1.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4"
-content-hash = "0ca004886d19ac41207be45d0068515e1bfa2262428b23b935b5abbd6791e74c"
+content-hash = "8eef2a3d29e43a815ded09e0cd89910796315cc3063cf401d0f1fb7805adde8c"

@@ -95,4 +95,15 @@ urlpatterns = [
         views.FediversedInstanceListView.as_view(),
         name="fediverserinstance-list",
     ),
+    path(
+        "api/changes",
+        views.ChangeFeedEntryListView.as_view(),
+        name="changefeedentry-list",
+    ),
+    path(
+        "api/changes/<int:pk>",
+        views.ChangeFeedEntryDetailView.as_view(),
+        name="changefeedentry-detail",
+    ),
+    path("feed/changes", views.ChangeFeed(), name="changefeed-feed"),
 ]
