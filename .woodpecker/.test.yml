@@ -1,7 +1,7 @@
 x-application-environment: &application-environment
   environment:
     DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
-    FEDIVERSER_ROOT_URLCONF: fediverser.services.admin.urls
+    FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
     FEDIVERSER_BROKER_URL: redis://broker:6379/0
     FEDIVERSER_CACHE_BACKEND: django_redis.cache.RedisCache
     FEDIVERSER_CACHE_LOCATION: redis://cache:6379/0
