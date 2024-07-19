@@ -1,0 +1,35 @@
+{% extends "portal/base.tmpl.html" %}
+{% load fediverser %}
+
+{% block main_content %}
+
+{% if not user.is_authenticated %}
+<h1 class="w-header__title">Welcome to {% site_name %}</h1>
+
+{% fediversed_lemmy as fediversed_lemmy_configuration %}
+{% if fediversed_lemmy_configuration.allows_reddit_signup %}
+<section>
+  <h3>One-click migration from Reddit to {{ fediversed_lemmy_configuration.instance.domain }}</h3>
+  <p>
+    If you are a Reddit user and want to import your subscriptions, we
+    can help. You just need to
+    <a href="{% url 'fediverser-core:reddit-connection-setup' %}">authorize the connection</a>
+    once, and we will import your subreddits to find the corresponding
+    Lemmy groups.
+  </p>
+</section>
+{% endif %}
+
+<section>
+  <h3>Help build the most comprehensive map of communities in the Fediverse</h3>
+  <p>
+    We already recommend alternatives for thousands of the most popular
+    subreddits. Our goal is to expand this database so that we can
+    help everyone find other people that share the same interests as yours.
+  </p>
+</section>
+
+{% else %}
+<h1 class="w-header__title">Hello, {{ user.username }}</h1>
+{% endif %}
+{% endblock %}

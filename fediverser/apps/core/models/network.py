@@ -40,10 +40,27 @@ class FediversedInstance(models.Model):
         response = client.post(url, json={"portal_url": self.portal_url})
         response.raise_for_status()
 
+    def endorse(self, partner):
+        if self == partner:
+            raise ValueError("Attempt to add endorsement to itself")
+
+        endorsement, _ = Endorsement.objects.get_or_create(endorser=self, endorsed=partner)
+        return endorsement
+
+    @property
+    def trusted_instances(self):
+        return FediversedInstance.objects.filter(endorsed_instances__endorser=self)
+
+    @property
+    def trusted_by(self):
+        return FediversedInstance.objects.filter(endorsing_instances__endorsed=self)
+
+    def __str__(self):
+        return self.portal_url
+
     @classmethod
     def current(cls):
         NODE_CONFIGURATION = {
-            "portal_url": app_settings.Portal.url,
             "accepts_community_requests": app_settings.Portal.accepts_community_requests,
             "allows_reddit_signup": app_settings.Portal.signup_with_reddit,
             "allows_reddit_mirrored_content": lemmy_settings.Instance.reddit_mirror_bots_enabled,
@@ -63,6 +80,7 @@ class FediversedInstance(models.Model):
             instance = None
 
         fediversed_instance, _ = cls.objects.update_or_create(
+            portal_url=app_settings.Portal.url,
             instance=instance,
             defaults=NODE_CONFIGURATION,
         )
@@ -84,8 +102,9 @@ class FediversedInstance(models.Model):
         instance_data = data.pop("instance", None)
 
         connected_instance = instance_data and Instance.fetch(instance_data["url"])
+        data["instance"] = connected_instance
 
-        instance, _ = cls.objects.update_or_create(instance=connected_instance, defaults=data)
+        instance, _ = cls.objects.update_or_create(portal_url=url, defaults=data)
         return instance
 
 
@@ -102,8 +121,12 @@ class Endorsement(models.Model):
 
 
 class ConnectedRedditAccount(models.Model):
-    reddit_account = models.ForeignKey(RedditAccount, on_delete=models.CASCADE)
-    actor = models.ForeignKey(Person, on_delete=models.CASCADE)
+    reddit_account = models.ForeignKey(
+        RedditAccount, related_name="connected_activitypub_accounts", on_delete=models.CASCADE
+    )
+    actor = models.ForeignKey(
+        Person, related_name="connected_reddit_accounts", on_delete=models.CASCADE
+    )
 
 
 class ChangeFeedEntry(TimeStampedModel):

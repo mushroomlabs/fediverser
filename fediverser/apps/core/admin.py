@@ -2,7 +2,6 @@ from django.contrib import admin, messages
 from django.db.models import Count
 
 from fediverser.apps.lemmy.services import LemmyClientRateLimited
-from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
 from . import tasks
 from .models.accounts import UserAccount
@@ -19,6 +18,7 @@ from .models.reddit import (
     RedditSubmission,
     RejectedPost,
 )
+from .settings import app_settings
 
 
 class ReadOnlyMixin:
@@ -138,9 +138,40 @@ class FediversedInstanceAdmin(admin.ModelAdmin):
         "portal_url",
         "instance__domain",
     )
-    actions = ("submit_registration",)
+    readonly_fields = (
+        "instance",
+        "allows_reddit_signup",
+        "allows_reddit_mirrored_content",
+        "accepts_community_requests",
+        "creates_reddit_mirror_bots",
+    )
+    actions = ("submit_registration", "fetch_instance_info", "endorse_instances")
 
-    @admin.action(description="register own instance on selected instances")
+    @admin.action(description="Mark selected instances as trusted")
+    def endorse_instances(self, request, queryset):
+        our_instance = FediversedInstance.current()
+        for instance in queryset:
+            try:
+                assert (
+                    instance != our_instance
+                ), f"Skipping {instance.portal_url}: can not endorse ourselves"
+                our_instance.endorse(instance)
+                messages.success(request, f"Endorsed {instance.portal_url}")
+            except AssertionError as exc:
+                messages.warning(request, str(exc))
+            except Exception as exc:
+                messages.error(request, f"Could not endorse {instance.portal_url}: {exc}")
+
+    @admin.action(description="Fetch information from selected instances")
+    def fetch_instance_info(self, request, queryset):
+        for instance in queryset.exclude(portal_url=None):
+            try:
+                FediversedInstance.fetch(instance.portal_url)
+                messages.success(request, f"Fetched {instance.portal_url}")
+            except Exception as exc:
+                messages.error(request, f"Failed to fetch data at {instance.portal_url}: {exc}")
+
+    @admin.action(description="Register own instance on selected instances")
     def submit_registration(self, request, queryset):
         own_instance = FediversedInstance.current()
         for instance in queryset:
@@ -151,7 +182,7 @@ class FediversedInstanceAdmin(admin.ModelAdmin):
                 messages.error(request, f"Failed to register at {instance.portal_url}: {exc}")
 
     def has_change_permission(self, request, obj=None):
-        return obj is None or obj.instance.domain == lemmy_settings.Instance.domain
+        return obj is None or obj.portal_url == app_settings.Portal.url
 
 
 @admin.register(Community)

@@ -6,6 +6,7 @@ from fediverser.apps.lemmy.services import LocalUserProxy
 from .activitypub import Community, Person
 from .feeds import CommunityFeed
 from .mapping import ChangeRequest
+from .network import FediversedInstance
 from .reddit import RedditAccount
 
 
@@ -20,11 +21,27 @@ class UserAccount(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
     )
-    lemmy_account = models.OneToOneField(
-        Person, related_name="portal_account", null=True, blank=True, on_delete=models.SET_NULL
-    )
     community_feeds = models.ManyToManyField(CommunityFeed)
     lemmy_local_username = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
+    def get_recommended_portal(self):
+        our_instance = FediversedInstance.current()
+        return our_instance.trusted_instances.exclude(instance=None).order_by("?").first()
+
+    @property
+    def connected_activitypub_accounts(self):
+        if self.reddit_account is None:
+            return Person.objects.none()
+
+        return Person.objects.filter(connected_reddit_accounts__reddit_account=self.reddit_account)
+
+    @property
+    def has_connected_activitypub_accounts(self):
+        return self.connected_activitypub_accounts.exists()
+
+    @property
+    def can_migrate_from_reddit(self):
+        return self.reddit_account is not None and not self.has_connected_activitypub_accounts
 
     @property
     def lemmy_client(self):

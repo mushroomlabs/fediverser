@@ -4,22 +4,17 @@
 {% block main_content %}
 
 {% if not user.is_authenticated %}
-<h1 class="w-header__title">Welcome to {% site_name %}</h1>
-
 <section>
-  {% fediversed_lemmy as fediversed_lemmy_configuration %}
-  {% fediverser_portal_settings as portal_settings %}
-  {% if fediversed_lemmy_configuration.allows_reddit_signup %}
-  <h3>One-click migration from Reddit to {{ fediversed_lemmy_configuration.instance.domain }}</h3>
-  <p>
-    If you are a Reddit user and want to import your subscriptions, we
-    can help. You just need to
-    <a href="{% url 'fediverser-core:reddit-connection-setup' %}">authorize the connection</a>
-    once, and we will import your subreddits to find the corresponding
-    Lemmy groups.
-  </p>
-  {% elif portal_settings.global_lemmy_instance_selector %}
-  <h3>Automatic instance selection, registration and subreddit import</h3>
+<h1 class="w-header__title">Welcome to {% site_name %}</h1>
+<p>
+  This website works as a communication hub for people in the
+  <a href="https://fediverse.party" target="_blank">Fediverse</a> and
+  is meant to help both new and experienced users, as well as instance
+  administrators. Here is what we can do:
+</p>
+</section>
+<section>
+  <h3>Get started in the Fediverse</h3>
   <p>
     The Fediverse works differently than traditional social networks,
     and this makes things a bit tricky. One of the biggest challenges
@@ -38,11 +33,10 @@
     In the process, we will also import your subreddits to find the
     corresponding Lemmy groups, so you can get started right away.
   </p>
-  {% endif %}
 </section>
 
 <section>
-  <h3>Help build the most comprehensive map of communities in the Fediverse</h3>
+  <h3>Build the most comprehensive map of communities in the Fediverse</h3>
   <p>
     We already recommend alternatives for thousands of the most popular
     subreddits. Our goal is to expand this database so that we can
@@ -52,5 +46,15 @@
 
 {% else %}
 <h1 class="w-header__title">Hello, {{ user.username }}</h1>
+
+{% if user.account.can_migrate_from_reddit %}
+<h2>Let's get you on board!</h2>
+<p>
+  We have everything ready to connect you to a server and
+  <a href="{% url 'fediverser-core:lemmy-onboarding-start' %}">set up your account</a>.
+</p>
+
+{% endif %}
+
 {% endif %}
 {% endblock %}

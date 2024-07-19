@@ -7,6 +7,11 @@ app_name = "fediverser-core"
 urlpatterns = [
     path("", views.HomeView.as_view(), name="portal-home"),
     path("connect/reddit/", views.RedditConnectionView.as_view(), name="reddit-connection-setup"),
+    path(
+        "onboard/lemmy/start",
+        views.SelectLemmyInstanceView.as_view(),
+        name="lemmy-onboarding-start",
+    ),
     path("activity", views.UserActionListView.as_view(), name="activity-list"),
     path("subreddits", views.SubredditListView.as_view(), name="subreddit-list"),
     path("instances", views.InstanceListView.as_view(), name="instance-list"),

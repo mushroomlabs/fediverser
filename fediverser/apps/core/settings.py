@@ -56,6 +56,14 @@ class AppSettings:
     def provides_automatic_lemmy_onboarding(self):
         return settings.FEDIVERSER_ENABLE_LEMMY_INTEGRATION
 
+    @property
+    def is_local_portal(self):
+        return self.provides_automatic_lemmy_onboarding
+
+    @property
+    def is_network_portal(self):
+        return not self.is_local_portal
+
     def __init__(self):
         self.load()
 
