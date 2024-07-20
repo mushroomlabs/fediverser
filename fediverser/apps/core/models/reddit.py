@@ -173,6 +173,25 @@ class RedditCommunity(models.Model):
         filter_kwargs[field_name + "__contains"] = search_term
         return cls.objects.filter(**filter_kwargs)
 
+    @classmethod
+    def fetch(cls, name):
+        client = make_reddit_client()
+        try:
+            praw_subreddit = client.subreddit(name)
+            data = praw_subreddit._fetch_data().get("data")
+            subreddit, _ = cls.objects.get_or_create(
+                name=praw_subreddit.display_name,
+                defaults={"description": data.get("description"), "over18": data.get("over18")},
+            )
+        except UnavailableForLegalReasons:
+            subreddit, _ = cls.objects.update_or_create(name=name, defaults={"metadata": None})
+
+        except (Forbidden, NotFound):
+            subreddit, _ = cls.objects.update_or_create(
+                name=name, defaults={"hidden": True, "metadata": {}}
+            )
+        return subreddit
+
     class Meta:
         verbose_name_plural = "Subreddit"
         verbose_name_plural = "Subreddits"

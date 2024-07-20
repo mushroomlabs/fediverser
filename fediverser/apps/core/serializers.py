@@ -140,8 +140,8 @@ class EndorsementEntrySerializer(ChangeFeedEntrySerializer):
 
 
 class RedditToCommunityRecommendationEntrySerializer(ChangeFeedEntrySerializer):
-    subreddit = serializers.CharField(source="recommendation.subreddit.name")
-    community = serializers.CharField(source="recommendation.community.url")
+    subreddit = serializers.CharField(source="subreddit.name")
+    community = serializers.CharField(source="community.url")
 
     class Meta:
         model = RedditToCommunityRecommendationEntry

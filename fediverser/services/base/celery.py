@@ -20,6 +20,10 @@ class FediverserCeleryConfig(object):
             "task": "fediverser.apps.core.tasks.clear_old_feed_entries",
             "schedule": crontab(minute=0, hour=0),
         },
+        "sync_change_feeds": {
+            "task": "fediverser.apps.core.tasks.sync_change_feeds",
+            "schedule": crontab(),
+        },
     }
 
     task_always_eager = settings.TEST_MODE

@@ -10,7 +10,7 @@ from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
 from .models.mapping import Category, ChangeRequest, RedditToCommunityRecommendation
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
-from .models.network import FediversedInstance
+from .models.network import ChangeFeedEntry, FediversedInstance
 from .models.reddit import (
     RedditAccount,
     RedditComment,
@@ -69,6 +69,16 @@ class FeedEntryAdmin(admin.ModelAdmin):
 @admin.register(CommunityFeed)
 class CommunityFeedAdmin(admin.ModelAdmin):
     list_display = ("feed", "community")
+
+
+@admin.register(ChangeFeedEntry)
+class ChangeFeedEntryAdmin(admin.ModelAdmin):
+    date_hierarchy = "created"
+    list_display = ("published_by", "description")
+
+    def get_queryset(self, *args, **kw):
+        qs = super().get_queryset(*args, **kw)
+        return qs.select_subclasses()
 
 
 @admin.register(ChangeRequest)

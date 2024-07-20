@@ -1,5 +1,6 @@
 import datetime
 import logging
+import random
 
 from celery import shared_task
 from django.conf import settings
@@ -14,6 +15,7 @@ from .models.activitypub import Community
 from .models.feeds import Entry, Feed
 from .models.invites import CommunityInvite, CommunityInviteTemplate
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost
+from .models.network import FediversedInstance
 from .models.reddit import (
     RedditAccount,
     RedditComment,
@@ -196,3 +198,33 @@ def clear_old_feed_entries():
     now = timezone.now()
     cutoff = now - Entry.MAX_AGE
     Entry.objects.filter(modified__lte=cutoff).delete()
+
+
+@shared_task
+def sync_change_feeds():
+    # We are going to set this task to run every minute, but to avoid
+    # "thundering herd" types of issues, we are going to execute the
+    # actual sync call X% of the time, where X is the amount of
+    # minutes elapsed since the last sync job.
+
+    # This will mean each instance will have a 50% of being synced
+    # after 20 minutes, and 100% after 1h40minutes.
+
+    instances_to_sync = FediversedInstance.partners.all()
+
+    if not instances_to_sync:
+        logger.info("No active partners to pull changes from")
+    logger.debug(
+        f"Attempting sync for {', '.join(instances_to_sync.values_list('portal_url', flat=True))}"
+    )
+
+    for instance in instances_to_sync:
+        last_sync = instance.sync_jobs.order_by("run_on").first()
+        since = last_sync and last_sync.run_on
+        if not since:
+            instance.sync_change_feeds()
+        else:
+            minutes_elapsed = int((timezone.now() - since).seconds / 60)
+
+            if (minutes_elapsed / 100) >= random.random():
+                instance.sync_change_feeds(since=since)

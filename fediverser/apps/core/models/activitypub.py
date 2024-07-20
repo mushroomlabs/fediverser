@@ -13,7 +13,7 @@ from .common import AP_SERVER_SOFTWARE, INSTANCE_STATUSES, Category, make_http_c
 logger = logging.getLogger(__name__)
 
 
-AP_CLIENT_REQUEST_HEADERS = {"Accept": "application/ld+json"}
+AP_CLIENT_REQUEST_HEADERS = {"Accept": "application/ld+json;application/activity+json"}
 
 
 def make_ap_client():
@@ -107,13 +107,7 @@ class Community(models.Model, ActorMixin):
         on_delete=models.SET_NULL,
     )
     tags = TaggableManager(blank=True)
-
-    @property
-    def url(self):
-        return {
-            AP_SERVER_SOFTWARE.lemmy: f"https://{self.instance.domain}/c/{self.name}",
-            AP_SERVER_SOFTWARE.kbin: f"https://{self.instance.domain}/m/{self.name}",
-        }.get(self.instance.software)
+    url = models.URLField(unique=True)
 
     @property
     def languages(self):
@@ -139,6 +133,27 @@ class Community(models.Model, ActorMixin):
     def __str__(self):
         return self.fqdn
 
+    @classmethod
+    def fetch(cls, url):
+        try:
+            domain = urlparse(url).hostname
+            instance = Instance.objects.filter(domain=domain).first() or Instance.fetch(
+                f"https://{domain}"
+            )
+            client = make_ap_client()
+            response = client.get(url)
+            response.raise_for_status()
+            community_data = response.json()
+
+            assert community_data.get("type") == "Group", "not an AP Group actor"
+            name = community_data["preferredUsername"]
+            community, _ = cls.objects.get_or_create(
+                url=url, defaults={"instance": instance, "name": name}
+            )
+            return community
+        except (KeyError, AssertionError) as exc:
+            raise ValueError(str(exc))
+
     class Meta:
         unique_together = ("instance", "name")
         verbose_name_plural = "Communities"
@@ -147,10 +162,28 @@ class Community(models.Model, ActorMixin):
 class Person(models.Model, ActorMixin):
     instance = models.ForeignKey(Instance, related_name="users", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    url = models.URLField(unique=True)
 
-    @property
-    def url(self):
-        return f"https://{self.instance.domain}/u/{self.name}"
+    @classmethod
+    def fetch(cls, url):
+        try:
+            domain = urlparse(url).hostname
+            instance = Instance.objects.filter(domain=domain).first() or Instance.fetch(
+                f"https://{domain}"
+            )
+            client = make_ap_client()
+            response = client.get(url)
+            response.raise_for_status()
+            person_data = response.json()
+
+            assert person_data.get("type") == "Person", "not an AP Person actor"
+            name = person_data["preferredUsername"]
+            person, _ = cls.objects.update_or_create(
+                url=url, defaults={"instance": instance, "name": name}
+            )
+            return person
+        except (KeyError, AssertionError) as exc:
+            raise ValueError(str(exc))
 
 
 __all__ = ("Instance", "Community", "Person")

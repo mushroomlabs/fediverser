@@ -1,6 +1,8 @@
-from urllib.parse import urlparse
+import logging
+from urllib.parse import urlencode, urlparse
 
 from django.db import models
+from django.utils import timezone
 from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel
 
@@ -9,10 +11,25 @@ from fediverser.apps.core.settings import app_settings
 from fediverser.apps.lemmy.services import InstanceProxy
 from fediverser.apps.lemmy.settings import app_settings as lemmy_settings
 
-from .activitypub import Instance, Person
+from .activitypub import Community, Instance, Person
 from .common import make_http_client
-from .mapping import RedditToCommunityRecommendation
-from .reddit import RedditAccount
+from .reddit import RedditAccount, RedditCommunity
+
+logger = logging.getLogger(__name__)
+
+
+class FediversedInstanceQuerySet(models.QuerySet):
+    def exclude_current(self):
+        return self.exclude(portal_url=app_settings.Portal.url)
+
+    def get_current(self):
+        return self.filter(portal_url=app_settings.Portal.url).first()
+
+
+class FediversedInstancePartnerModelManager(models.Manager):
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.exclude(portal_url=app_settings.Portal.url)
 
 
 class FediversedInstance(models.Model):
@@ -23,13 +40,17 @@ class FediversedInstance(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
     )
-    portal_url = models.URLField(null=True, blank=True)
+    portal_url = models.URLField(unique=True)
+
     allows_reddit_signup = models.BooleanField(default=True)
     allows_reddit_mirrored_content = models.BooleanField(default=False)
     creates_reddit_mirror_bots = models.BooleanField(default=False)
     accepts_community_requests = models.BooleanField(
         default=False, help_text="Accepts Community Requests"
     )
+
+    objects = FediversedInstanceQuerySet.as_manager()
+    partners = FediversedInstancePartnerModelManager()
 
     def submit_registration(self, partner):
         if self == partner:
@@ -111,6 +132,42 @@ class FediversedInstance(models.Model):
         instance, _ = cls.objects.update_or_create(portal_url=url, defaults=data)
         return instance
 
+    def sync_change_feeds(self, since=None):
+        client = make_http_client()
+        url = f"{self.portal_url}/api/changes?page=1"
+
+        keep_going = True
+
+        # Ensure we alawys have a timezone-aware datetime
+        if since is not None and since.tzinfo is None:
+            since = timezone.make_aware(since)
+
+        while keep_going:
+            if since:
+                url += "&" + urlencode({"since": since.isoformat()})
+            try:
+                response = client.get(url, headers={"Accept": "application/json"})
+                response.raise_for_status()
+                entries = response.json()
+                for entry in entries:
+                    try:
+                        ChangeFeedEntry.make(instance=self, entry=entry)
+                    except Exception:
+                        logger.exception("Failed to parse feed entry", extra={"entry": entry})
+                try:
+                    url = [
+                        st.split(";")[0].removeprefix("<").removesuffix(">")
+                        for st in response.headers["link"].split(",")
+                        if 'rel="next"' in st
+                    ].pop()
+                except (IndexError, KeyError):
+                    keep_going = False
+            except Exception:
+                logger.exception(f"Failed to sync change feed from {self}")
+                keep_going = False
+
+        self.sync_jobs.create()
+
 
 class Endorsement(models.Model):
     endorser = models.ForeignKey(
@@ -147,6 +204,14 @@ class ChangeFeedEntry(TimeStampedModel):
     def description(self):
         return f"Change #{self.id}:"
 
+    @classmethod
+    def make(cls, instance, entry):
+        change_subclass = {klass.TYPE: klass for klass in cls.__subclasses__()}.get(entry["type"])
+        return change_subclass.make(instance, entry)
+
+    class Meta:
+        verbose_name_plural = "Change Entries"
+
 
 class ConnectedRedditAccountEntry(ChangeFeedEntry):
     TYPE = "connection:reddit"
@@ -159,6 +224,17 @@ class ConnectedRedditAccountEntry(ChangeFeedEntry):
         actor_url = self.connection.actor.url
         return f"{self.connection.reddit_account} connected as {actor_url}"
 
+    @classmethod
+    def make(cls, instance, entry):
+        reddit_account, _ = RedditAccount.objects.get_or_create(username=entry["reddit_account"])
+        actor_url = entry["actor"]
+        actor = Person.objects.filter(url=actor_url).first() or Person.fetch(actor_url)
+
+        connection, _ = ConnectedRedditAccount.objects.get_or_create(
+            reddit_account=reddit_account, actor=actor
+        )
+        return cls.objects.create(published_by=instance, connection=connection)
+
 
 class EndorsementEntry(ChangeFeedEntry):
     TYPE = "endorsement"
@@ -170,13 +246,51 @@ class EndorsementEntry(ChangeFeedEntry):
     def description(self):
         return f"{self.endorsement.endorser} endorses {self.endorsement.endorsed}"
 
+    @classmethod
+    def make(cls, instance, entry):
+        endorsed, _ = FediversedInstance.objects.get_or_create(portal_url=entry["endorsed"])
+        endorsement, _ = Endorsement.objects.get_or_create(endorser=instance, endorsed=endorsed)
+        return cls.objects.create(published_by=instance, endorsement=endorsement)
+
 
 class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
     TYPE = "recommendation:group"
 
-    recommendation = models.ForeignKey(
-        RedditToCommunityRecommendation, related_name="feed_entries", on_delete=models.CASCADE
+    subreddit = models.ForeignKey(
+        RedditCommunity, related_name="recommendation_feed_entries", on_delete=models.CASCADE
     )
+    community = models.ForeignKey(
+        Community, related_name="recommendation_feed_entries", on_delete=models.CASCADE
+    )
+
+    @property
+    def description(self):
+        return f"{self.community} as alternative to {self.subreddit}"
+
+    @classmethod
+    def make(cls, instance, entry):
+        subreddit_name = entry["subreddit"]
+        actor_url = entry["community"]
+
+        assert subreddit_name is not None, "invalid subreddit name"
+        assert actor_url is not None, "invalid url for community"
+
+        subreddit = RedditCommunity.objects.filter(
+            name__iexact=subreddit_name
+        ) or RedditCommunity.fetch(subreddit_name)
+
+        community = Community.objects.filter(url=actor_url).first() or Community.fetch(actor_url)
+        return cls.objects.create(published_by=instance, subreddit=subreddit, community=community)
+
+
+class SyncJob(models.Model):
+    run_on = models.DateTimeField(auto_now_add=True)
+    instance = models.ForeignKey(
+        FediversedInstance, related_name="sync_jobs", on_delete=models.CASCADE
+    )
+
+    def __str__(self):
+        return f"{self.instance.portal_url} sync run on {self.run_on.isoformat()}"
 
 
 __all__ = (
@@ -187,4 +301,5 @@ __all__ = (
     "EndorsementEntry",
     "ConnectedRedditAccountEntry",
     "RedditToCommunityRecommendationEntry",
+    "SyncJob",
 )
