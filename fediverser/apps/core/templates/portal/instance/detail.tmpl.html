@@ -9,8 +9,37 @@
   <dt>Category</dt>
   <dd>{{ object.category.full_name }}</dd>
   {% endif %}
+  {% if object.related_countries.exists %}
+  <dt>Recommended for people in</dt>
+  <dd>
+    {% for related_country in object.related_countries.all %}
+    {{ related_country.country.name }} <img class="flag" src="{{ related_country.country.flag }}" alt="Flag of {{ related_country.country.name }}" />
+    <br />
+    {% endfor %}
+  </dd>
+  {% endif %}
 </dl>
 <hr />
+
+<h3>Local Groups?</h3>
+{% if not user|pending_instance_country_proposal:object %}
+<p>If this instance is for users of a country or common region, you can indicate it here:</p>
+<form action="{% url 'fediverser-core:instance-countryrecommendation-create' domain=object.domain %}" method="POST" novalidate>
+  {% csrf_token %}
+  <ul class="fields">
+    {% for field in country_picker_form.visible_fields %}
+    <li>
+      {% include "wagtailadmin/shared/field.html" %}
+    </li>
+    {% endfor %}
+    <li>
+      <input type="submit" value="Submit Country" class="button" />
+    </li>
+  </ul>
+</form>
+{% else %}
+<p>You already recommended a country! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
+{% endif %}
 
 {% if not object.category %}
 <h3>Category</h3>

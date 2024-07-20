@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 import requests
 from django import forms
 from django.core.exceptions import ValidationError
+from django_countries.fields import CountryField
 
 from . import models
 from .models.activitypub import AP_SERVER_SOFTWARE
@@ -197,6 +198,14 @@ class InstanceCategoryRecommendationForm(forms.ModelForm):
     class Meta:
         model = models.SetInstanceCategory
         fields = ("category",)
+
+
+class InstanceCountryRecommendationForm(forms.ModelForm):
+    country = CountryField().formfield()
+
+    class Meta:
+        model = models.SetInstanceCountry
+        fields = ("country",)
 
 
 class CommunityFeedForm(forms.ModelForm):

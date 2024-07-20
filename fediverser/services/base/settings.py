@@ -35,6 +35,7 @@ DJANGO_APPS = (
 THIRD_PARTY_APPS = (
     "django_celery_beat",
     "django_celery_results",
+    "django_countries",
     "django_extensions",
     "django_filters",
     "drf_link_header_pagination",

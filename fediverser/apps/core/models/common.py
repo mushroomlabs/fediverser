@@ -58,3 +58,6 @@ class Category(TreeNode):
 
     class Meta:
         verbose_name_plural = "Categories"
+
+
+__all__ = ("Category",)

@@ -217,9 +217,26 @@ class InstanceDetailView(DetailView):
         context.update(
             {
                 "category_picker_form": forms.InstanceCategoryRecommendationForm(),
+                "country_picker_form": forms.InstanceCountryRecommendationForm(),
             }
         )
         return context
+
+
+class InstanceCountryRecommendationCreateView(CreateView):
+    model = models.SetInstanceCountry
+    form_class = forms.InstanceCountryRecommendationForm
+    page_title = "Instance Country"
+    page_subtitle = "Recommend Country"
+    view_name = "fediverser-core:instance-countryrecommendation-create"
+
+    def get_success_url(self, *args, **kw):
+        return reverse("fediverser-core:instance-detail", kwargs=self.kwargs)
+
+    def form_valid(self, form):
+        form.instance.requester = self.request.user
+        form.instance.instance = models.Instance.objects.get(domain=self.kwargs["domain"])
+        return super().form_valid(form)
 
 
 class InstanceCategoryRecommendationCreateView(CreateView):

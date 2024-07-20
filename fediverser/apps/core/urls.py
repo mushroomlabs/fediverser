@@ -32,6 +32,11 @@ urlpatterns = [
         name="instance-categoryrecommendation-create",
     ),
     path(
+        "instances/<str:domain>/recommend/country",
+        views.InstanceCountryRecommendationCreateView.as_view(),
+        name="instance-countryrecommendation-create",
+    ),
+    path(
         "communities/create",
         views.CommunityCreateView.as_view(),
         name="community-create",

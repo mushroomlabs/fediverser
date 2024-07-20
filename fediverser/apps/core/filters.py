@@ -1,7 +1,13 @@
 from django.db.models import Q
+from django_countries import countries
 from django_filters import rest_framework as filters
 
 from . import models
+
+
+def get_country_list():
+    country_list = models.InstanceCountry.objects.values_list("country", flat=True).distinct()
+    return [(c, countries.name(c)) for c in country_list]
 
 
 class ChangeRequestFilter(filters.FilterSet):
@@ -11,9 +17,14 @@ class ChangeRequestFilter(filters.FilterSet):
 
 
 class InstanceFilter(filters.FilterSet):
+    country = filters.ChoiceFilter(choices=get_country_list, label="Country", method="by_country")
+
+    def by_country(self, queryset, name, value):
+        return queryset.filter(related_countries__country=value)
+
     class Meta:
         model = models.Instance
-        fields = ("category", "software")
+        fields = ("category", "software", "country")
 
 
 class CommunityFilter(filters.FilterSet):

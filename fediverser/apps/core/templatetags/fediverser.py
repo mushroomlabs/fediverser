@@ -144,6 +144,16 @@ def pending_instance_category_proposal(user, instance):
 
 
 @register.filter
+def pending_instance_country_proposal(user, instance):
+    if not user.is_authenticated:
+        return instance.category_change_requests.none()
+
+    return instance.country_selection_requests.filter(
+        requester=user, status=ChangeRequest.STATUS.requested
+    ).last()
+
+
+@register.filter
 def has_pending_instance_status_change_request(user, instance):
     return (
         user.is_authenticated

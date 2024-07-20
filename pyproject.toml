@@ -62,6 +62,7 @@ django-tree-queries = "^0.19.0"
 feedparser = "^6.0.11"
 djangorestframework-link-header-pagination = "^0.1.1"
 django-rest-polymorphic = "^0.1.10"
+django-countries = "^7.6.1"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.14.0"

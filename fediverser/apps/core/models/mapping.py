@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
+from django_countries.fields import CountryField
 from model_utils import Choices
 from model_utils.managers import InheritanceManager, QueryManager
 from model_utils.models import StatusModel
@@ -13,6 +14,23 @@ from .reddit import RedditCommunity
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+class InstanceExtraInformation(models.Model):
+    instance = models.OneToOneField(Instance, related_name="extra", on_delete=models.CASCADE)
+    invite_only = models.BooleanField(null=True, blank=True)
+    application_required = models.BooleanField(null=True, blank=True)
+    payment_required = models.BooleanField(default=False)
+
+
+class InstanceCountry(models.Model):
+    instance = models.ForeignKey(
+        Instance, related_name="related_countries", on_delete=models.CASCADE
+    )
+    country = CountryField()
+
+    class Meta:
+        unique_together = ("instance", "country")
 
 
 class RedditToCommunityRecommendation(models.Model):
@@ -114,6 +132,20 @@ class SetInstanceCategory(ChangeRequest):
         self.instance.save()
 
 
+class SetInstanceCountry(ChangeRequest):
+    instance = models.ForeignKey(
+        Instance, related_name="country_selection_requests", on_delete=models.CASCADE
+    )
+    country = CountryField()
+
+    @property
+    def description(self):
+        return f"Set {self.instance} as for people from {self.country.name}"
+
+    def apply(self):
+        InstanceCountry.objects.get_or_create(instance=self.instance, country=self.country)
+
+
 class CommunityRequest(StatusModel):
     STATUS = Choices("requested", "accepted", "rejected")
     requested_by = models.ForeignKey(
@@ -132,3 +164,17 @@ class CommunityRequest(StatusModel):
         blank=True,
         on_delete=models.SET_NULL,
     )
+
+
+__all__ = (
+    "InstanceExtraInformation",
+    "InstanceCountry",
+    "RedditToCommunityRecommendation",
+    "ChangeRequest",
+    "SetRedditCommunityCategory",
+    "RecommendCommunity",
+    "SetCommunityCategory",
+    "SetInstanceCategory",
+    "SetInstanceCountry",
+    "CommunityRequest",
+)
