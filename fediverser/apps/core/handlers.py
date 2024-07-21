@@ -160,7 +160,9 @@ def on_recommendation_created_publish_change_feed_entry(sender, **kw):
     if kw["created"]:
         recommendation = kw["instance"]
         RedditToCommunityRecommendationEntry.objects.create(
-            published_by=FediversedInstance.current(), recommendation=recommendation
+            published_by=FediversedInstance.current(),
+            subreddit=recommendation.subreddit,
+            community=recommendation.community,
         )
 
 

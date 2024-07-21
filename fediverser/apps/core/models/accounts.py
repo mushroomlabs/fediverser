@@ -7,7 +7,7 @@ from .activitypub import Community, Person
 from .feeds import CommunityFeed
 from .mapping import ChangeRequest
 from .network import FediversedInstance
-from .reddit import RedditAccount
+from .reddit import RedditAccount, RedditCommunity
 
 
 class UserAccount(models.Model):
@@ -23,10 +23,21 @@ class UserAccount(models.Model):
     )
     community_feeds = models.ManyToManyField(CommunityFeed)
     lemmy_local_username = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    tracked_subreddits = models.ManyToManyField(RedditCommunity)
 
     def get_recommended_portal(self):
         our_instance = FediversedInstance.current()
         return our_instance.trusted_instances.exclude(instance=None).order_by("?").first()
+
+    @property
+    def recommended_communities(self):
+        return Community.objects.filter(
+            recommendations__subreddit__in=self.tracked_subreddits.all()
+        )
+
+    @property
+    def subreddits_without_recommendation(self):
+        return self.tracked_subreddits.filter(recommendations__isnull=True)
 
     @property
     def connected_activitypub_accounts(self):

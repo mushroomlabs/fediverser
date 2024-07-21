@@ -6,6 +6,7 @@
   <thead>
     <tr>
       <th scope="col">Community</th>
+      <th scope="col">Alternative to</th>
       <th scope="col">Category</th>
     </tr>
   </thead>
@@ -19,6 +20,13 @@
           </a>
           <a href="{{ community.url }}" target="_blank">🌐</a>
         </div>
+      </td>
+      <td>
+        {% for recommendation in community.recommendations.all %}
+        <a href="{% url 'fediverser-core:subreddit-detail' name=recommendation.subreddit.name %}">{{ recommendation.subreddit }}</a>
+        {% empty %}
+        No recommendation yet
+        {% endfor %}
       </td>
       <td>{{ community.category.full_name|default:"Not categorized yet" }}</td>
     </tr>

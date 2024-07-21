@@ -49,6 +49,7 @@ class ListView(BaseListView):
 
     def get_filter_set_kwargs(self):
         return {
+            "request": self.request,
             "data": self.request.GET,
             "queryset": self.get_base_queryset(),
         }

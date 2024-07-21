@@ -9,7 +9,6 @@ from django_countries.fields import CountryField
 from . import models
 from .models.activitypub import AP_SERVER_SOFTWARE
 from .models.feeds import CommunityFeed, Feed
-from .models.reddit import make_reddit_client
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +25,10 @@ class CategoryPickerForm(forms.Form):
 
 
 class SubredditCreateForm(forms.ModelForm):
-    def clean_name(self):
+    def save(self):
         name = self.cleaned_data["name"]
-        if models.RedditCommunity.objects.filter(name__iexact=name).exists():
-            raise ValidationError("Subreddit is already in database")
-
-        reddit = make_reddit_client()
         try:
-            subreddit = reddit.subreddit(name)
-            return subreddit.display_name
+            return models.RedditCommunity.fetch(name)
         except Exception as exc:
             raise ValidationError(f"Could not verify details for {name} subreddit: {exc}")
 

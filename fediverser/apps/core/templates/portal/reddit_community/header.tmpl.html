@@ -1,0 +1,13 @@
+{% extends "portal/partials/header.tmpl.html" %}
+{% load wagtailadmin_tags fediverser %}
+
+{% block right_column %}
+<div class="actionbutton">
+  <form action="{{ action_url }}" method="POST" novalidate>
+    {% csrf_token %}
+    {% with header_action_icon as action_icon_name %}
+    <button class="button bicolor button--icon">{% icon name=action_icon_name wrapped=1 %}{{ action_text|capfirst }}</button>
+    {% endwith %}
+  </form>
+</div>
+{% endblock %}

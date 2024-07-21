@@ -1,5 +1,10 @@
-{% extends "portal/generic/base.tmpl.html" %}
+{% extends "portal/base.tmpl.html" %}
 {% load fediverser %}
+
+
+{% block main_header %}
+{% include "portal/reddit_community/header.tmpl.html" with title=page_title subtitle=page_subtitle action_url=header_action_url action_text=header_action_label icon=header_icon subreddit=object %}
+{% endblock %}
 
 {% block main_content %}
 <dl>

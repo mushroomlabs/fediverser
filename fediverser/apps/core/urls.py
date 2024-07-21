@@ -68,6 +68,14 @@ urlpatterns = [
     ),
     path("subreddits/create", views.SubredditCreateView.as_view(), name="subreddit-create"),
     path("subreddits/<str:name>", views.SubredditDetailView.as_view(), name="subreddit-detail"),
+    path(
+        "subreddits/<str:name>/subscribe", views.subscribe_to_subreddit, name="subreddit-subscribe"
+    ),
+    path(
+        "subreddits/<str:name>/unsubscribe",
+        views.unsubscribe_from_subreddit,
+        name="subreddit-unsubscribe",
+    ),
     path("subreddits/<str:name>/lock", views.lock_subreddit, name="subreddit-lock"),
     path(
         "subreddits/<str:name>/recommend/category",

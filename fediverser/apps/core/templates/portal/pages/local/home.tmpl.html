@@ -1,11 +1,23 @@
 {% extends "portal/base.tmpl.html" %}
-{% load fediverser %}
+{% load fediverser wagtailadmin_tags %}
 
 {% block main_content %}
+<header class="w-header w-header--merged">
+  <div class="row">
+    <div class="left">
+      <div class="col">
+        <h1 class="w-header__title" id="header-title">Welcome to {% site_name %}</h1>
+        {% if user.is_authenticated %}
+        <div class="w-header__description">{{ user }}</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="right">
+    </div>
+  </div>
+</header>
 
 {% if not user.is_authenticated %}
-<h1 class="w-header__title">Welcome to {% site_name %}</h1>
-
 {% fediversed_lemmy as fediversed_lemmy_configuration %}
 {% if fediversed_lemmy_configuration.allows_reddit_signup %}
 <section>
@@ -30,6 +42,22 @@
 </section>
 
 {% else %}
-<h1 class="w-header__title">Hello, {{ user.username }}</h1>
+<section class="w-summary" aria-labelledby="header-title">
+  <h2 class="w-sr-only">Your dashboard</h2>
+  <ul class="w-summary__list">
+    <li>
+      {% icon name="group" %}
+      <a href="{% url 'fediverser-core:subreddit-list' %}">
+        <span>{{ user.account.tracked_subreddits.count }}</span> subreddits tracked
+      </a>
+    </li>
+    <li>
+      {% icon name="group" %}
+      <a href="{% url 'fediverser-core:community-list' %}">
+        <span>{{ user.account.recommended_communities.count }}</span> communities recommended for you</span>
+      </a>
+    </li>
+  </ul>
+</section>
 {% endif %}
 {% endblock %}

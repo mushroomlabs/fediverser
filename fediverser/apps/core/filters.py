@@ -46,7 +46,7 @@ class RedditCommunityFilter(filters.FilterSet):
 
     def with_reddit_subscriptions(self, queryset, name, value):
         action = queryset.filter if value else queryset.exclude
-        return action(subscribers=self.request.user)
+        return action(useraccount__user=self.request.user)
 
     class Meta:
         model = models.RedditCommunity

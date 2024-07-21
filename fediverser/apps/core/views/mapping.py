@@ -79,6 +79,12 @@ class SubredditDetailView(DetailView):
 
         subreddit = context["object"]
 
+        is_subscriber = subreddit in self.request.user.account.tracked_subreddits.all()
+        header_action_label = "Unsubscribe" if is_subscriber else "Subscribe"
+        header_action_view_name = (
+            "subreddit-unsubscribe" if is_subscriber else "subreddit-subscribe"
+        )
+
         context.update(
             {
                 "breadcrumbs_items": build_breadcrumbs(),
@@ -88,6 +94,12 @@ class SubredditDetailView(DetailView):
                 "category_picker_form": forms.CategoryPickerForm(),
                 "recommended_alternative_form": forms.SubredditAlternativeRecommendationForm(),
                 "community_request_form": forms.CommunityRequestForm(),
+                "header_action_label": header_action_label,
+                "header_action_url": reverse(
+                    f"fediverser-core:{header_action_view_name}",
+                    kwargs={"name": subreddit.name},
+                ),
+                "header_action_icon": "cross" if is_subscriber else "plus",
             }
         )
         return context
@@ -156,6 +168,7 @@ class UserActionListView(LoginRequiredMixin, ListView):
 class SubredditListView(ListView):
     model = models.RedditCommunity
     filterset_class = RedditCommunityFilter
+    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     template_name = "portal/reddit_community/list.tmpl.html"
     view_name = "fediverser-core:subreddit-list"
     breadcrumb_label = "Subreddits"
@@ -354,3 +367,56 @@ def lock_subreddit(request, *args, **kw):
         subreddit.save()
 
     return HttpResponse(status=202)
+
+
+@csrf_exempt
+@user_passes_test(lambda u: u.is_authenticated)
+def subscribe_to_subreddit(request, *args, **kw):
+    name = kw["name"]
+    subreddit = get_object_or_404(models.RedditCommunity, name=name)
+
+    if request.method == "POST":
+        request.user.account.tracked_subreddits.add(subreddit)
+
+    return HttpResponseRedirect(
+        reverse("fediverser-core:subreddit-detail", kwargs={"name": subreddit.name})
+    )
+
+
+@csrf_exempt
+@user_passes_test(lambda u: u.is_authenticated)
+def unsubscribe_from_subreddit(request, *args, **kw):
+    name = kw["name"]
+    subreddit = get_object_or_404(models.RedditCommunity, name=name)
+
+    if request.method == "POST":
+        request.user.account.tracked_subreddits.remove(subreddit)
+    return HttpResponseRedirect(
+        reverse("fediverser-core:subreddit-detail", kwargs={"name": subreddit.name})
+    )
+
+
+__all__ = (
+    "SubredditCreateView",
+    "CommunityCreateView",
+    "InstanceCreateView",
+    "CommunityDetailView",
+    "SubredditDetailView",
+    "SubredditAlternativeRecommendationCreateView",
+    "SubredditCategoryRecommendationCreateView",
+    "UserActionListView",
+    "SubredditListView",
+    "InstanceListView",
+    "InstanceDetailView",
+    "InstanceCountryRecommendationCreateView",
+    "InstanceCategoryRecommendationCreateView",
+    "CommunityListView",
+    "CommunityCategoryRecommendationCreateView",
+    "CommunityRequestListView",
+    "RedditCommunityListView",
+    "CommunityRequestCreateView",
+    "CommunityFeedCreateView",
+    "lock_subreddit",
+    "subscribe_to_subreddit",
+    "unsubscribe_from_subreddit",
+)
