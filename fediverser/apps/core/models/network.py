@@ -215,14 +215,16 @@ class ChangeFeedEntry(TimeStampedModel):
 
 class ConnectedRedditAccountEntry(ChangeFeedEntry):
     TYPE = "connection:reddit"
-    connection = models.ForeignKey(
-        ConnectedRedditAccount, related_name="feed_entries", on_delete=models.CASCADE
+    reddit_account = models.ForeignKey(
+        RedditAccount, related_name="connection_feed_entries", on_delete=models.CASCADE
+    )
+    actor = models.ForeignKey(
+        Person, related_name="reddit_connection_feed_entries", on_delete=models.CASCADE
     )
 
     @property
     def description(self):
-        actor_url = self.connection.actor.url
-        return f"{self.connection.reddit_account} connected as {actor_url}"
+        return f"{self.reddit_account} connected to {self.actor.url}"
 
     @classmethod
     def make(cls, instance, entry):
@@ -230,10 +232,10 @@ class ConnectedRedditAccountEntry(ChangeFeedEntry):
         actor_url = entry["actor"]
         actor = Person.objects.filter(url=actor_url).first() or Person.fetch(actor_url)
 
-        connection, _ = ConnectedRedditAccount.objects.get_or_create(
-            reddit_account=reddit_account, actor=actor
+        entry, _ = cls.objects.get_or_create(
+            published_by=instance, reddit_account=reddit_account, actor=actor
         )
-        return cls.objects.create(published_by=instance, connection=connection)
+        return entry
 
 
 class EndorsementEntry(ChangeFeedEntry):
@@ -250,7 +252,8 @@ class EndorsementEntry(ChangeFeedEntry):
     def make(cls, instance, entry):
         endorsed, _ = FediversedInstance.objects.get_or_create(portal_url=entry["endorsed"])
         endorsement, _ = Endorsement.objects.get_or_create(endorser=instance, endorsed=endorsed)
-        return cls.objects.create(published_by=instance, endorsement=endorsement)
+        entry, _ = cls.objects.get_or_create(published_by=instance, endorsement=endorsement)
+        return entry
 
 
 class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
@@ -280,7 +283,10 @@ class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
         ) or RedditCommunity.fetch(subreddit_name)
 
         community = Community.objects.filter(url=actor_url).first() or Community.fetch(actor_url)
-        return cls.objects.create(published_by=instance, subreddit=subreddit, community=community)
+        entry, _ = cls.objects.get_or_create(
+            published_by=instance, subreddit=subreddit, community=community
+        )
+        return entry
 
 
 class SyncJob(models.Model):
