@@ -204,6 +204,20 @@ class ChangeFeedEntry(TimeStampedModel):
     def description(self):
         return f"Change #{self.id}:"
 
+    @property
+    def merged_on(self):
+        try:
+            return self.merge_info.created
+        except AttributeError:
+            return None
+
+    def merge(self):
+        self._merge()
+        MergedEntry.objects.create(entry=self)
+
+    def _merge(self):
+        raise NotImplementedError("This needs to be implemented by the child class")
+
     @classmethod
     def make(cls, instance, entry):
         change_subclass = {klass.TYPE: klass for klass in cls.__subclasses__()}.get(entry["type"])
@@ -225,6 +239,11 @@ class ConnectedRedditAccountEntry(ChangeFeedEntry):
     @property
     def description(self):
         return f"{self.reddit_account} connected to {self.actor.url}"
+
+    def _merge(self):
+        ConnectedRedditAccount.objects.get_or_create(
+            reddit_account=self.reddit_account, actor=self.actor
+        )
 
     @classmethod
     def make(cls, instance, entry):
@@ -248,6 +267,9 @@ class EndorsementEntry(ChangeFeedEntry):
     def description(self):
         return f"{self.endorsement.endorser} endorses {self.endorsement.endorsed}"
 
+    def _merge(self):
+        return
+
     @classmethod
     def make(cls, instance, entry):
         endorsed, _ = FediversedInstance.objects.get_or_create(portal_url=entry["endorsed"])
@@ -270,6 +292,11 @@ class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
     def description(self):
         return f"{self.community} as alternative to {self.subreddit}"
 
+    def _merge(self):
+        RedditToCommunityRecommendationEntry.objects.get_or_create(
+            subreddit=self.subreddit, community=self.community
+        )
+
     @classmethod
     def make(cls, instance, entry):
         subreddit_name = entry["subreddit"]
@@ -287,6 +314,12 @@ class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
             published_by=instance, subreddit=subreddit, community=community
         )
         return entry
+
+
+class MergedEntry(TimeStampedModel):
+    entry = models.OneToOneField(
+        ChangeFeedEntry, related_name="merge_info", on_delete=models.CASCADE
+    )
 
 
 class SyncJob(models.Model):
@@ -307,5 +340,6 @@ __all__ = (
     "EndorsementEntry",
     "ConnectedRedditAccountEntry",
     "RedditToCommunityRecommendationEntry",
+    "MergedEntry",
     "SyncJob",
 )

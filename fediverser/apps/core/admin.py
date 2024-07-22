@@ -10,7 +10,11 @@ from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
 from .models.mapping import Category, ChangeRequest, RedditToCommunityRecommendation
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
-from .models.network import ChangeFeedEntry, FediversedInstance
+from .models.network import (
+    ChangeFeedEntry,
+    FediversedInstance,
+    RedditToCommunityRecommendationEntry,
+)
 from .models.reddit import (
     RedditAccount,
     RedditComment,
@@ -74,11 +78,35 @@ class CommunityFeedAdmin(admin.ModelAdmin):
 @admin.register(ChangeFeedEntry)
 class ChangeFeedEntryAdmin(admin.ModelAdmin):
     date_hierarchy = "created"
-    list_display = ("published_by", "description")
+    list_display = ("published_by", "description", "merged_on")
+    actions = ("merge_entries",)
+
+    @admin.action(description="Merge selected entries into our database")
+    def merge_entries(self, request, queryset):
+        good = 0
+        for entry in queryset:
+            try:
+                entry.merge()
+                good += 1
+            except Exception as exc:
+                messages.error(request, f"Failed to merge {entry.description}: {exc}")
+        if good:
+            messages.success(request, f"Merged {good} entries")
+
+    def _get_subclassed_qs(self, qs):
+        return qs.select_subclasses()
 
     def get_queryset(self, *args, **kw):
-        qs = super().get_queryset(*args, **kw)
-        return qs.select_subclasses()
+        qs = self._get_subclassed_qs(super().get_queryset(*args, **kw))
+        return qs.prefetch_related("merge_info")
+
+
+@admin.register(RedditToCommunityRecommendationEntry)
+class RedditToCommunityRecommendationEntryAdmin(ChangeFeedEntryAdmin):
+    list_display = ("published_by", "description", "merged_on")
+
+    def _get_subclassed_qs(self, qs):
+        return qs
 
 
 @admin.register(ChangeRequest)
