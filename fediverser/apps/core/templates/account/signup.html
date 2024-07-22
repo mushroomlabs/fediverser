@@ -8,7 +8,7 @@
 <main class="content-wrapper" id="main">
   <h1>
     {% block branding_login %}
-    Sign in to {% site_name %}
+    Sign up to {% site_name %}
     {% endblock %}
   </h1>
 
@@ -34,8 +34,8 @@
   <div class="login-form">
     {% block login_form %}
     {% if portal_settings.open_registrations %}
-    {% url 'account_login' as login_url %}
-    {% element form form=form method="post" action=login_url tags="entrance,login" %}
+    {% url 'account_signup' as signup_url %}
+    {% element form form=form method="post" action=action_url tags="entrance,signup" %}
     {% slot body %}
     {% csrf_token %}
     {% element fields form=form unlabeled=True %}
@@ -44,20 +44,26 @@
     {% endslot %}
     {% slot actions %}
     <button class="button button-longrunning">
-      <em data-w-progress-target="label">{% trans 'Sign In' %}</em>
+      <em data-w-progress-target="label">{% trans 'Sign Up' %}</em>
     </button>
     {% endslot %}
     {% endelement %}
     <hr />
-    {% endif %}
     <p>
-      To access {% site_name %}, we recommend you login with your
-      social media accounts:
+      Alternatively, you can sign up using your existing social
+      network accounts. Hint: migration is a lot easier if you choose this method!
     </p>
+    {% else %}
+    <p>
+      To access {% site_name %}, you need to use one of your existing
+      social media accounts, which we'll use to automatically connect
+      you to the Fediverse.
+    </p>
+    {% endif %}
     <footer class="form-actions">
       {% block submit_buttons %}
       <a href="{% url 'fediverser-core:reddit-connection-setup' %}" class="button button-longrunning">
-        <em data-w-progress-target="label">{% trans 'Sign in via Reddit' %}</em>
+        <em data-w-progress-target="label">{% trans 'Signup via Reddit' %}</em>
       </a>
       {% endblock %}
     </footer>

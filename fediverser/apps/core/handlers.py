@@ -1,5 +1,6 @@
 import logging
 
+from allauth.account.signals import user_signed_up
 from allauth.socialaccount.models import SocialAccount, SocialToken
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
 from allauth.socialaccount.signals import pre_social_login, social_account_updated
@@ -29,6 +30,12 @@ from .tasks import fetch_feed, post_mirror_disclosure, subscribe_to_community
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+@receiver(user_signed_up)
+def on_user_signed_up_create_user_account(sender, **kw):
+    user = kw["user"]
+    UserAccount.objects.get_or_create(user=user)
 
 
 @receiver(post_save, sender=LemmyMirroredPost)

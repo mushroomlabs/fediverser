@@ -36,10 +36,20 @@ def sidebar_json_script(context, element_id):
         sidebar.LinkMenuItem(
             "login",
             _("Login"),
-            reverse("fediverser-core:reddit-connection-setup"),
+            reverse("account_login"),
             icon_name="login",
-        ),
+        )
     ]
+
+    if app_settings.Portal.open_registrations:
+        anonymous_user_menu.append(
+            sidebar.LinkMenuItem(
+                "signup",
+                _("Sign Up"),
+                reverse("account_signup"),
+                icon_name="login",
+            )
+        )
 
     account_menu = logged_user_menu if request.user.is_authenticated else anonymous_user_menu
     main_menu = [

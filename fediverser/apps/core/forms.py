@@ -2,8 +2,10 @@ import logging
 from urllib.parse import urlparse
 
 import requests
+from allauth.account.forms import PasswordField, SignupForm as BaseSignupForm
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from django_countries.fields import CountryField
 
 from . import models
@@ -11,6 +13,14 @@ from .models.activitypub import AP_SERVER_SOFTWARE
 from .models.feeds import CommunityFeed, Feed
 
 logger = logging.getLogger(__name__)
+
+
+class SignupForm(BaseSignupForm):
+    def __init__(self, *args, **kw):
+        super(SignupForm, self).__init__(*args, **kw)
+        self.fields["password1"] = PasswordField(
+            label=_("Password"), autocomplete="new-password", help_text=""
+        )
 
 
 class ContentFeedField(forms.Field):

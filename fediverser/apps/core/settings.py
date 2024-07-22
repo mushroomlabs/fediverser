@@ -1,11 +1,14 @@
 import logging
 
+import environ
 from allauth.socialaccount.models import SocialApp
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
 from django.conf import settings
 from django.test.signals import setting_changed
 
 logger = logging.getLogger(__name__)
+env = environ.Env()
+environ.Env.read_env()
 
 _SETTINGS_KEY = "FEDIVERSER"
 
@@ -14,7 +17,7 @@ class AppSettings:
     class Portal:
         url = None
         name = "Fediverser Portal"
-        open_registrations = True
+        open_registrations = env.bool("FEDIVERSER_PORTAL_OPEN_REGISTRATIONS", default=False)
         default_hub_url = "https://fediverser.network"
         signup_with_reddit = True
         global_lemmy_instance_selector = False

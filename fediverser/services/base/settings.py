@@ -214,6 +214,8 @@ ACCOUNT_EMAIL_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_PRESERVE_USERNAME_CASING = False
 
+ACCOUNT_FORMS = {"signup": "fediverser.apps.core.forms.SignupForm"}
+
 SOCIALACCOUNT_PROVIDERS = {
     "reddit": {
         "AUTH_PARAMS": {"duration": "permanent", "access_type": "offline"},

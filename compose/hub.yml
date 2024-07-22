@@ -29,6 +29,7 @@ x-fediverser-web-service-envvars: &fediverser-service-envvars
   FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
   FEDIVERSER_ENABLE_LEMMY: "false"
   FEDIVERSER_GLOBAL_LEMMY_INSTANCE_LOCATOR: "true"
+  FEDIVERSER_PORTAL_OPEN_REGISTRATIONS: "true"
   IPYTHONDIR: /tmp/ipython
 
 x-fediverser-dev: &fediverser-dev-service
@@ -94,7 +95,7 @@ services:
       timeout: 30s
       retries: 50
     volumes:
-      - cache-data:/data
+      - hub-cache-data:/data
 
   hub:
     <<: [*fediverser-dev-service, *fediverser-webservice]
@@ -155,7 +156,6 @@ volumes:
       type: none
       o: bind
       device: "${FEDIVERSER_HUB_BROKER_MOUNT_PATH?Variable not set}"
-
 
   hub-cache-data:
     driver: local
