@@ -216,6 +216,7 @@ ACCOUNT_PRESERVE_USERNAME_CASING = False
 
 ACCOUNT_FORMS = {"signup": "fediverser.apps.core.forms.SignupForm"}
 
+SOCIALACCOUNT_ADAPTER = "fediverser.apps.core.adapters.FediverserSocialAccountAdapter"
 SOCIALACCOUNT_PROVIDERS = {
     "reddit": {
         "AUTH_PARAMS": {"duration": "permanent", "access_type": "offline"},

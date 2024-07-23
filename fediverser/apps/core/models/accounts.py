@@ -40,13 +40,6 @@ class UserAccount(models.Model):
         return self.tracked_subreddits.filter(recommendations__isnull=True)
 
     @property
-    def connected_activitypub_accounts(self):
-        if self.reddit_account is None:
-            return Person.objects.none()
-
-        return Person.objects.filter(connected_reddit_accounts__reddit_account=self.reddit_account)
-
-    @property
     def has_connected_activitypub_accounts(self):
         return self.connected_activitypub_accounts.exists()
 
@@ -68,6 +61,15 @@ class UserAccount(models.Model):
 
     def check_lemmy_password(self, cleartext):
         return bool(self.lemmy_local_user) and self.lemmy_local_user.check_password(cleartext)
+
+
+class ConnectedActivityPubAccount(models.Model):
+    account = models.ForeignKey(
+        UserAccount, related_name="connected_activitypub_accounts", on_delete=models.CASCADE
+    )
+    actor = models.ForeignKey(
+        Person, related_name="connected_portal_accounts", on_delete=models.CASCADE
+    )
 
 
 class CommunityAmbassador(models.Model):
@@ -93,4 +95,9 @@ class CommunityAmbassadorApplication(ChangeRequest):
         self.requester.account.representing_communities.create(community=self.community)
 
 
-__all__ = ("UserAccount", "CommunityAmbassador", "CommunityAmbassadorApplication")
+__all__ = (
+    "UserAccount",
+    "CommunityAmbassador",
+    "CommunityAmbassadorApplication",
+    "ConnectedActivityPubAccount",
+)

@@ -2,20 +2,7 @@
 {% load fediverser wagtailadmin_tags %}
 
 {% block main_content %}
-<header class="w-header w-header--merged">
-  <div class="row">
-    <div class="left">
-      <div class="col">
-        <h1 class="w-header__title" id="header-title">Welcome to {% site_name %}</h1>
-        {% if user.is_authenticated %}
-        <div class="w-header__description">{{ user }}</div>
-        {% endif %}
-      </div>
-    </div>
-    <div class="right">
-    </div>
-  </div>
-</header>
+<h1 class="w-header__title">Welcome to {% site_name %}</h1>
 
 {% if not user.is_authenticated %}
 {% fediversed_lemmy as fediversed_lemmy_configuration %}
@@ -23,11 +10,9 @@
 <section>
   <h3>One-click migration from Reddit to {{ fediversed_lemmy_configuration.instance.domain }}</h3>
   <p>
-    If you are a Reddit user and want to import your subscriptions, we
-    can help. You just need to
-    <a href="{% url 'fediverser-core:reddit-connection-setup' %}">authorize the connection</a>
-    once, and we will import your subreddits to find the corresponding
-    Lemmy groups.
+    <a href="{% url 'fediverser-core:reddit-login' %}">Login with Reddit</a> and
+    we will automatically create an account for you and subscribe to all your
+    favorite commuities.
   </p>
 </section>
 {% endif %}

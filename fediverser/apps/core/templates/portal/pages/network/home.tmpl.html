@@ -24,15 +24,6 @@
     also makes you spend some time learning about the different
     options.
   </p>
-
-  <p>
-    This tool removes this initial guesswork and makes the process a
-    lot easier.
-    <a href="{% url 'fediverser-core:reddit-connection-setup' %}">You just need to have a Reddit account</a>
-    and we will find the best server for you and register you there.
-    In the process, we will also import your subreddits to find the
-    corresponding Lemmy groups, so you can get started right away.
-  </p>
 </section>
 
 <section>
@@ -43,18 +34,29 @@
     help everyone find other people that share the same interests as yours.
   </p>
 </section>
-
 {% else %}
 <h1 class="w-header__title">Hello, {{ user.username }}</h1>
+{% endif %}
 
-{% if user.account.can_migrate_from_reddit %}
-<h2>Let's get you on board!</h2>
+{% if not user.is_authenticated or not user.account.has_connected_activitypub_accounts %}
+<h2>Server Finder</h2>
 <p>
-  We have everything ready to connect you to a server and
-  <a href="{% url 'fediverser-core:lemmy-onboarding-start' %}">set up your account</a>.
+  Fediverser streamlines the whole onboarding process. We ask a few
+  simple questions about your interests and use to find the best
+  server for you and subscribe you to the most relevant communities automatically.
+</p>
+{% if user.is_authenticated and user.account.reddit_account is None %}
+<p>
+  Hint: If you have a <a href="{% url 'fediverser-core:reddit-connection-setup' %}">Reddit</a>
+  account we can collect your favorite subreddits to make the process even faster!
+</p>
+{% elif not user.is_authenticated %}
+<p>
+  Hint: If you sign-in with <a href="{% url 'fediverser-core:reddit-login' %}">Reddit</a>
+  account we can collect your favorite subreddits to make the process even faster!
 </p>
 
 {% endif %}
-
 {% endif %}
+
 {% endblock %}

@@ -3,7 +3,11 @@ import logging
 from allauth.account.signals import user_signed_up
 from allauth.socialaccount.models import SocialAccount, SocialToken
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
-from allauth.socialaccount.signals import pre_social_login, social_account_updated
+from allauth.socialaccount.signals import (
+    pre_social_login,
+    social_account_added,
+    social_account_updated,
+)
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
@@ -36,6 +40,27 @@ User = get_user_model()
 def on_user_signed_up_create_user_account(sender, **kw):
     user = kw["user"]
     UserAccount.objects.get_or_create(user=user)
+
+
+@receiver(social_account_added)
+def on_reddit_user_connected_link_user_account(sender, **kw):
+    social_login = kw["sociallogin"]
+    social_account = social_login.account
+
+    if social_account.provider == RedditProvider.id:
+        reddit_username = social_account.extra_data["name"]
+
+        reddit_account, new_redditor = RedditAccount.objects.get_or_create(
+            username=reddit_username
+        )
+
+        try:
+            user_account, _ = UserAccount.objects.update_or_create(
+                user=social_account.user, defaults={"reddit_account": reddit_account}
+            )
+        except IntegrityError:
+            logger.warning("User already is associated with different reddit account")
+            return
 
 
 @receiver(post_save, sender=LemmyMirroredPost)
