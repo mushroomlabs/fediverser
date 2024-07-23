@@ -257,6 +257,8 @@ STATIC_ROOT = env.str(
 MEDIA_ROOT = os.getenv("FEDIVERSER_MEDIA_ROOT", os.path.abspath(os.path.join(BASE_DIR, "media")))
 MEDIA_URL = os.getenv("FEDIVERSER_MEDIA_URL", "/media/")
 
+# Countries
+COUNTRIES_FLAG_URL = "flags/{code}.svg"
 
 # Rest Framework
 REST_RENDERERS = ("BrowsableAPIRenderer", "JSONRenderer") if DEBUG else ("JSONRenderer",)

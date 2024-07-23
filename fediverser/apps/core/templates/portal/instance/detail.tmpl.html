@@ -13,7 +13,9 @@
   <dt>Recommended for people in</dt>
   <dd>
     {% for related_country in object.related_countries.all %}
-    {{ related_country.country.name }} <img class="flag" src="{{ related_country.country.flag }}" alt="Flag of {{ related_country.country.name }}" />
+    {{ related_country.country.name }}
+
+    <img class="flag" src="{{ related_country.country.flag }}" alt="Flag of {{ related_country.country.name }}" />
     <br />
     {% endfor %}
   </dd>

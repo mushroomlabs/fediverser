@@ -1,0 +1,10 @@
+dl dd {
+  line-height: 2vh;
+  display: flex;
+  align-items: center;
+}
+
+img.flag {
+  max-height: 1.2vh;
+  margin: auto 0.5rem;
+}
