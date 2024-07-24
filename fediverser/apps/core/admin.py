@@ -8,7 +8,13 @@ from .models.accounts import UserAccount
 from .models.activitypub import Community, Instance
 from .models.feeds import CommunityFeed, Entry, Feed
 from .models.invites import CommunityInviteTemplate
-from .models.mapping import Category, ChangeRequest, RedditToCommunityRecommendation
+from .models.mapping import (
+    Category,
+    ChangeRequest,
+    InstanceTopic,
+    RedditToCommunityRecommendation,
+    Topic,
+)
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
 from .models.network import (
     ChangeFeedEntry,
@@ -142,6 +148,18 @@ class CategoryAdmin(admin.ModelAdmin):
     def get_queryset(self, request, *args, **kw):
         qs = super().get_queryset(request, *args, **kw)
         return qs.with_tree_fields()
+
+
+@admin.register(Topic)
+class TopicAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "description")
+
+
+@admin.register(InstanceTopic)
+class InstanceTopicAdmin(admin.ModelAdmin):
+    list_display = ("instance", "topic")
+    list_filter = ("topic",)
+    autocomplete_fields = ("instance",)
 
 
 class CommunityInline(admin.TabularInline):

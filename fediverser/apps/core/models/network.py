@@ -4,7 +4,7 @@ from urllib.parse import urlencode, urlparse
 from django.db import models
 from django.utils import timezone
 from model_utils.managers import InheritanceManager
-from model_utils.models import TimeStampedModel
+from model_utils.models import StatusModel, TimeStampedModel
 
 from fediverser.apps.core.models.common import AP_SERVER_SOFTWARE, INSTANCE_STATUSES
 from fediverser.apps.core.settings import app_settings
@@ -30,6 +30,11 @@ class FediversedInstancePartnerModelManager(models.Manager):
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.exclude(portal_url=app_settings.Portal.url)
+
+
+class InstanceStatus(StatusModel):
+    STATUS = INSTANCE_STATUSES
+    instance = models.OneToOneField(Instance, related_name="status", on_delete=models.CASCADE)
 
 
 class FediversedInstance(models.Model):
@@ -333,6 +338,7 @@ class SyncJob(models.Model):
 
 
 __all__ = (
+    "InstanceStatus",
     "FediversedInstance",
     "Endorsement",
     "ConnectedRedditAccount",

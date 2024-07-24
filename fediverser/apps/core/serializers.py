@@ -18,7 +18,15 @@ from .models.reddit import RedditCommunity
 class InstanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Instance
-        fields = read_only_fields = ("url", "software")
+        fields = read_only_fields = ("url", "software", "description", "over18")
+
+
+class InstanceRecommendationSerializer(serializers.ModelSerializer):
+    score = serializers.FloatField()
+
+    class Meta:
+        model = Instance
+        fields = read_only_fields = ("domain", "description", "score")
 
 
 class FediversedInstanceSerializer(serializers.ModelSerializer):

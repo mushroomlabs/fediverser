@@ -8,3 +8,58 @@ img.flag {
   max-height: 1.2vh;
   margin: auto 0.5rem;
 }
+
+ul.instance-selector-options, ul.instance-selector-options ul {
+  list-style-type: none;
+  padding-left: 0;
+  width: 100%;
+}
+
+ul.instance-selector-options li {
+  padding-left: 0;
+}
+
+ul.instance-selector-options > li.option {
+  border-bottom: 1px dashed #444;
+  padding: 2vh 1rem;
+}
+
+ul.countries {
+  display: flex;
+  flex-wrap: wrap;
+}
+ul.instance-selector-options ul.countries li.country-option img {
+  min-width: 80px;
+}
+
+li.topic {
+  margin: 1vh auto;
+}
+
+li.country-option {
+  min-width: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: hidden;
+  cursor: pointer;
+}
+
+li.country-option figcaption{
+  text-align: center;
+  display: none;
+}
+
+li.country-option.selected figcaption, li.country-option:hover figcaption {
+  display: block;
+}
+
+ul.countries li.country-option img.flag {
+  max-height: 4vh !important;
+  margin: 1vh 3rem;
+  filter: grayscale(75%);
+}
+
+ul.countries li.country-option.selected img.flag,  ul.countries li.country-option:hover img.flag {
+  filter: grayscale(0%) !important;
+}

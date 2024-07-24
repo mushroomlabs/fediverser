@@ -2,11 +2,16 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django_countries.fields import CountryField
 from model_utils import Choices
 from model_utils.managers import InheritanceManager, QueryManager
 from model_utils.models import StatusModel
+from taggit.managers import TaggableManager
+from wagtail.images.models import Image
+from wagtail.snippets.models import register_snippet
 
 from .activitypub import Community, Instance
 from .common import Category
@@ -16,11 +21,32 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class InstanceExtraInformation(models.Model):
-    instance = models.OneToOneField(Instance, related_name="extra", on_delete=models.CASCADE)
-    invite_only = models.BooleanField(null=True, blank=True)
-    application_required = models.BooleanField(null=True, blank=True)
-    payment_required = models.BooleanField(default=False)
+class LockedItem(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    item = GenericForeignKey("content_type", "object_id")
+
+
+@register_snippet
+class Topic(models.Model):
+    code = models.SlugField(unique=True)
+    name = models.CharField(max_length=64, unique=True)
+    description = models.TextField()
+    icon = models.ForeignKey(
+        Image, related_name="topics_icons", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    tags = TaggableManager()
+
+    def __str__(self):
+        return self.name
+
+
+class InstanceTopic(models.Model):
+    instance = models.ForeignKey(Instance, related_name="topics", on_delete=models.CASCADE)
+    topic = models.ForeignKey(Topic, related_name="instances", on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ("instance", "topic")
 
 
 class InstanceCountry(models.Model):
@@ -31,6 +57,14 @@ class InstanceCountry(models.Model):
 
     class Meta:
         unique_together = ("instance", "country")
+
+
+class InstanceExtraInformation(models.Model):
+    instance = models.OneToOneField(Instance, related_name="extra", on_delete=models.CASCADE)
+    invite_only = models.BooleanField(null=True, blank=True)
+    application_required = models.BooleanField(null=True, blank=True)
+    payment_required = models.BooleanField(default=False)
+    abandoned = models.BooleanField(default=False)
 
 
 class RedditToCommunityRecommendation(models.Model):
@@ -167,8 +201,10 @@ class CommunityRequest(StatusModel):
 
 
 __all__ = (
-    "InstanceExtraInformation",
+    "Topic",
     "InstanceCountry",
+    "InstanceTopic",
+    "InstanceExtraInformation",
     "RedditToCommunityRecommendation",
     "ChangeRequest",
     "SetRedditCommunityCategory",

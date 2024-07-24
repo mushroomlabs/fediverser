@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import F
+from django.db.models import F, Q, Value
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -9,7 +9,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics
 
 from .. import forms, models, serializers
-from ..filters import ChangeRequestFilter, CommunityFilter, InstanceFilter, RedditCommunityFilter
+from ..filters import (
+    ChangeRequestFilter,
+    CommunityFilter,
+    InstanceFilter,
+    InstanceRecommendationFilter,
+    RedditCommunityFilter,
+)
 from .common import CreateView, DetailView, ListView, build_breadcrumbs
 
 
@@ -205,6 +211,8 @@ class InstanceListView(ListView):
     header_action_label = "Add new Instance"
     header_action_url = reverse_lazy("fediverser-core:instance-create")
 
+    queryset = models.Instance.objects.exclude(extra__abandoned=True)
+
 
 class InstanceDetailView(DetailView):
     model = models.Instance
@@ -329,6 +337,25 @@ class CommunityRequestCreateView(CreateView):
         return super().form_valid(form)
 
 
+class InstanceRecommendationsListView(generics.ListAPIView):
+    serializer_class = serializers.InstanceRecommendationSerializer
+    filterset_class = InstanceRecommendationFilter
+    MAX_SUGGESTIONS = 3
+
+    def get_queryset(self, *args, **kw):
+        application_not_required_q = Q(extra__application_required=False)
+        open_registrations_q = Q(open_registrations=True)
+        can_register_via_api_q = application_not_required_q & open_registrations_q
+        reddit_login_q = Q(fediverser_configuration__allows_reddit_signup=True)
+        return models.Instance.objects.filter(can_register_via_api_q | reddit_login_q).annotate(
+            score=Value(1.0)
+        )
+
+    def filter_queryset(self, queryset, *args, **kw):
+        qs = super().filter_queryset(queryset)
+        return qs.order_by("-score", "?")[: self.MAX_SUGGESTIONS]
+
+
 class CommunityFeedCreateView(CreateView):
     model = models.CommunityFeed
     form_class = forms.CommunityFeedForm
@@ -410,6 +437,7 @@ __all__ = (
     "InstanceDetailView",
     "InstanceCountryRecommendationCreateView",
     "InstanceCategoryRecommendationCreateView",
+    "InstanceRecommendationsListView",
     "CommunityListView",
     "CommunityCategoryRecommendationCreateView",
     "CommunityRequestListView",

@@ -14,18 +14,13 @@ urlpatterns = [
         name="lemmy-onboarding-start",
     ),
     path("activity", views.UserActionListView.as_view(), name="activity-list"),
-    path("subreddits", views.SubredditListView.as_view(), name="subreddit-list"),
     path("instances", views.InstanceListView.as_view(), name="instance-list"),
-    path("communities", views.CommunityListView.as_view(), name="community-list"),
+    path("instances/create", views.InstanceCreateView.as_view(), name="instance-create"),
+    path("instances/<str:domain>", views.InstanceDetailView.as_view(), name="instance-detail"),
     path(
-        "instances/create",
-        views.InstanceCreateView.as_view(),
-        name="instance-create",
-    ),
-    path(
-        "instances/<str:domain>",
-        views.InstanceDetailView.as_view(),
-        name="instance-detail",
+        "instances/<str:domain>/signup",
+        views.InstanceSignupPageView.as_view(),
+        name="instance-redirect-signup",
     ),
     path(
         "instances/<str:domain>/recommend/category",
@@ -37,6 +32,7 @@ urlpatterns = [
         views.InstanceCountryRecommendationCreateView.as_view(),
         name="instance-countryrecommendation-create",
     ),
+    path("communities", views.CommunityListView.as_view(), name="community-list"),
     path(
         "communities/create",
         views.CommunityCreateView.as_view(),
@@ -67,6 +63,7 @@ urlpatterns = [
         views.CommunityFeedCreateView.as_view(),
         name="community-contentfeed-create",
     ),
+    path("subreddits", views.SubredditListView.as_view(), name="subreddit-list"),
     path("subreddits/create", views.SubredditCreateView.as_view(), name="subreddit-create"),
     path("subreddits/<str:name>", views.SubredditDetailView.as_view(), name="subreddit-detail"),
     path(
@@ -108,6 +105,11 @@ urlpatterns = [
         "api/fediverser-instances",
         views.FediversedInstanceListView.as_view(),
         name="fediverserinstance-list",
+    ),
+    path(
+        "api/instance/recommendations",
+        views.InstanceRecommendationsListView.as_view(),
+        name="api-instancerecommendation-list",
     ),
     path(
         "api/changes",

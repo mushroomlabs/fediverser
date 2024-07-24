@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Case, Exists, F, FloatField, OuterRef, Q, When
 from django_countries import countries
 from django_filters import rest_framework as filters
 
@@ -10,6 +10,10 @@ def get_country_list():
     return [(c, countries.name(c)) for c in country_list]
 
 
+def get_topic_list():
+    return [(d.code, d.name) for d in models.Topic.objects.all()]
+
+
 class ChangeRequestFilter(filters.FilterSet):
     class Meta:
         model = models.ChangeRequest
@@ -18,13 +22,56 @@ class ChangeRequestFilter(filters.FilterSet):
 
 class InstanceFilter(filters.FilterSet):
     country = filters.ChoiceFilter(choices=get_country_list, label="Country", method="by_country")
+    topic = filters.ChoiceFilter(choices=get_topic_list, label="Interests", method="by_topic")
 
     def by_country(self, queryset, name, value):
         return queryset.filter(related_countries__country=value)
 
+    def by_topic(self, queryset, name, value):
+        return queryset.filter(topics__topic__code=value)
+
     class Meta:
         model = models.Instance
-        fields = ("category", "software", "country")
+        fields = ("software", "country", "topic")
+
+
+class InstanceRecommendationFilter(InstanceFilter):
+    topic = filters.MultipleChoiceFilter(
+        choices=get_topic_list, label="Interests", method="by_topic"
+    )
+
+    def get_annotated_score(self, queryset, conditional, weight=2):
+        when_exists = When(Exists(conditional), then=weight * F("score"))
+        when_not_exists = When(~Exists(conditional), then=F("score") / weight)
+        return queryset.annotate(
+            score=Case(when_exists, when_not_exists, default=F("score"), output_field=FloatField())
+        )
+
+    def by_country(self, queryset, name, value):
+        return self.get_annotated_score(
+            queryset,
+            models.InstanceCountry.objects.filter(instance=OuterRef("pk"), country=value),
+            weight=10,
+        )
+
+    def by_topic(self, queryset, name, value):
+        return self.get_annotated_score(
+            queryset,
+            models.InstanceTopic.objects.filter(instance=OuterRef("pk"), topic__code__in=value),
+        )
+
+    @property
+    def qs(self):
+        queryset = super().qs
+        if "topic" not in self.data:
+            queryset = self.get_annotated_score(
+                queryset, models.InstanceTopic.objects.filter(instance=OuterRef("pk")), weight=0.5
+            )
+        return queryset
+
+    class Meta:
+        model = models.Instance
+        fields = ("country", "topic")
 
 
 class CommunityFilter(filters.FilterSet):

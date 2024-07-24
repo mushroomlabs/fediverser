@@ -3,12 +3,11 @@ from urllib.parse import urlparse
 
 from django.db import models
 from pythorhead.types import LanguageType
-from taggit.managers import TaggableManager
 
 from fediverser.apps.lemmy.models import Community as LemmyCommunity, Language
 from fediverser.apps.lemmy.services import InstanceProxy
 
-from .common import AP_SERVER_SOFTWARE, INSTANCE_STATUSES, Category, make_http_client
+from .common import AP_SERVER_SOFTWARE, Category, make_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +23,10 @@ def make_ap_client():
 
 class Instance(models.Model):
     domain = models.CharField(max_length=255, unique=True)
-    category = models.ForeignKey(
-        Category,
-        related_name="instances",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-    )
-    status = models.CharField(max_length=20, choices=INSTANCE_STATUSES, null=True, blank=True)
     name = models.CharField(max_length=30, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     over18 = models.BooleanField(default=False)
     open_registrations = models.BooleanField(default=False)
-    tags = TaggableManager(blank=True)
     software = models.CharField(max_length=30, choices=AP_SERVER_SOFTWARE)
 
     @property
@@ -71,7 +61,11 @@ class Instance(models.Model):
         software_info = cls.get_software_info(url)
 
         instance, _ = cls.objects.update_or_create(
-            domain=domain, defaults={"software": software_info["software"]["name"]}
+            domain=domain,
+            defaults={
+                "software": software_info["software"]["name"],
+                "open_registrations": software_info.get("openRegistrations") or False,
+            },
         )
         return instance
 
@@ -106,7 +100,6 @@ class Community(models.Model, ActorMixin):
         blank=True,
         on_delete=models.SET_NULL,
     )
-    tags = TaggableManager(blank=True)
     url = models.URLField(unique=True)
 
     @property

@@ -1,12 +1,13 @@
 from django.contrib.syndication.views import Feed
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.feedgenerator import Atom1Feed
 from django.views.generic.base import RedirectView
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 
-from fediverser.apps.core.models import ChangeFeedEntry, FediversedInstance
+from fediverser.apps.core.models import ChangeFeedEntry, FediversedInstance, Instance
 
 from .. import serializers
 from ..filters import ChangeFeedFilter, FediversedInstanceFilter
@@ -86,6 +87,12 @@ class ChangeFeed(Feed):
         return reverse("fediverser-core:changefeedentry-detail", args=[item.pk])
 
 
+class InstanceSignupPageView(RedirectView):
+    def get_redirect_url(self, *args, **kw):
+        instance = get_object_or_404(Instance, domain=self.kwargs["domain"])
+        return f"{instance.url}/signup"
+
+
 __all__ = (
     "NodeInfoView",
     "FediversedInstanceListView",
@@ -93,4 +100,5 @@ __all__ = (
     "ChangeFeedEntryListView",
     "ChangeFeedEntryDetailView",
     "ChangeFeed",
+    "InstanceSignupPageView",
 )

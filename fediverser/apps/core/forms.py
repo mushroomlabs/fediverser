@@ -49,7 +49,7 @@ class SubredditCreateForm(forms.ModelForm):
 
 class CommunityCreateForm(forms.ModelForm):
     url = forms.URLField(
-        required=True, help_text="Full URL of instance (e.g, https://lemmy.ml/c/fediverse)"
+        required=True, help_text="Full URL of community (e.g, https://lemmy.ml/c/fediverse)"
     )
 
     @property
@@ -114,9 +114,7 @@ class CommunityCreateForm(forms.ModelForm):
 
 
 class InstanceCreateForm(forms.ModelForm):
-    url = forms.URLField(
-        required=True, help_text="Full URL of instance (e.g, https://lemmy.ml/c/fediverse)"
-    )
+    url = forms.URLField(required=True, help_text="Full URL of instance (e.g, https://lemmy.ml)")
 
     @property
     def server_software(self):

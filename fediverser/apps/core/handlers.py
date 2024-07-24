@@ -16,6 +16,7 @@ from django.dispatch import receiver
 
 from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 
+from . import tasks
 from .models.accounts import UserAccount
 from .models.activitypub import Instance, Person
 from .models.feeds import Feed
@@ -30,7 +31,6 @@ from .models.network import (
 from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
 from .settings import app_settings
 from .signals import redditor_migrated
-from .tasks import fetch_feed, post_mirror_disclosure, subscribe_to_community
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -67,7 +67,7 @@ def on_reddit_user_connected_link_user_account(sender, **kw):
 def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
     if kw["created"] and not kw["raw"]:
         mirrored_post = kw["instance"]
-        post_mirror_disclosure.delay(mirrored_post.id)
+        tasks.post_mirror_disclosure.delay(mirrored_post.id)
 
 
 @receiver(post_save, sender=SocialAccount)
@@ -177,14 +177,14 @@ def on_subreddit_added_subscribe_to_corresponding_community(sender, **kw):
             if not subreddit:
                 continue
             for recommendation in subreddit.recommendations.all():
-                subscribe_to_community.delay(lemmy_user.id, recommendation.community.id)
+                tasks.subscribe_to_community.delay(lemmy_user.id, recommendation.community.id)
 
 
 @receiver(post_save, sender=Feed)
 def on_feed_created_fetch_entries(sender, **kw):
     if kw["created"]:
         feed = kw["instance"]
-        fetch_feed.delay(feed_url=feed.url)
+        tasks.fetch_feed.delay(feed_url=feed.url)
 
 
 @receiver(post_save, sender=RedditToCommunityRecommendation)
@@ -196,6 +196,13 @@ def on_recommendation_created_publish_change_feed_entry(sender, **kw):
             subreddit=recommendation.subreddit,
             community=recommendation.community,
         )
+
+
+@receiver(post_save, sender=Instance)
+def on_instance_created_get_extra_information(sender, **kw):
+    if kw["created"]:
+        instance = kw["instance"]
+        tasks.get_instance_details.delay(instance.domain)
 
 
 @receiver(redditor_migrated, sender=ConnectedRedditAccount)

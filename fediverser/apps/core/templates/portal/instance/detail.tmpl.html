@@ -5,10 +5,6 @@
 <dl>
   <dt>Instance URL</dt>
   <dd><a href="{{ object.url }}"}} target="_blank">{{ object.url }}</a></dd>
-  {% if object.category %}
-  <dt>Category</dt>
-  <dd>{{ object.category.full_name }}</dd>
-  {% endif %}
   {% if object.related_countries.exists %}
   <dt>Recommended for people in</dt>
   <dd>
@@ -41,28 +37,6 @@
 </form>
 {% else %}
 <p>You already recommended a country! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
-{% endif %}
-
-{% if not object.category %}
-<h3>Category</h3>
-{% if not user|pending_instance_category_proposal:object %}
-<p>This instance has not been properly categorized yet. Please indicate the category which closest describe it:</p>
-<form action="{% url 'fediverser-core:instance-categoryrecommendation-create' domain=object.domain %}" method="POST" novalidate>
-  {% csrf_token %}
-  <ul class="fields">
-    {% for field in category_picker_form.visible_fields %}
-    <li>
-      {% include "wagtailadmin/shared/field.html" %}
-    </li>
-    {% endfor %}
-    <li>
-      <input type="submit" value="Submit Category" class="button" />
-    </li>
-  </ul>
-</form>
-{% else %}
-<p>You already recommended a category! Please check your <a href="{% url 'fediverser-core:activity-list' %}">activity page</a> for more information.</p>
-{% endif %}
 {% endif %}
 
 {% endblock %}

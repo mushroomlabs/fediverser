@@ -1,4 +1,5 @@
 from django import template
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import json_script
@@ -7,7 +8,7 @@ from wagtail.admin.ui import sidebar
 from wagtail.telepath import JSContext, adapter
 
 from fediverser.apps.core.models.feeds import Entry
-from fediverser.apps.core.models.mapping import ChangeRequest
+from fediverser.apps.core.models.mapping import ChangeRequest, InstanceCountry, Topic
 from fediverser.apps.core.models.network import FediversedInstance
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
 from fediverser.apps.core.settings import app_settings
@@ -240,6 +241,20 @@ def submissions_from_related_subreddits(community):
 @register.filter
 def subreddit_counterparts(community):
     return RedditCommunity.objects.filter(recommendations__community=community)
+
+
+@register.simple_tag
+def instance_selection_options():
+    application_required_q = Q(instance__extra__application_required=True)
+    registration_closed_q = Q(instance__open_registrations=False)
+
+    instance_countries = InstanceCountry.objects.exclude(
+        application_required_q | registration_closed_q
+    )
+    return {
+        "countries": instance_countries.values_list("country", flat=True).distinct(),
+        "topics": Topic.objects.all(),
+    }
 
 
 @register.simple_tag

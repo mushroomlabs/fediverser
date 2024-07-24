@@ -11,9 +11,11 @@ from django.utils import timezone
 from fediverser.apps.lemmy.services import LemmyClientRateLimited, LocalUserProxy
 
 from .choices import AutomaticSubmissionPolicies
-from .models.activitypub import Community
+from .models.activitypub import Community, Instance, make_ap_client
+from .models.common import AP_SERVER_SOFTWARE
 from .models.feeds import Entry, Feed
 from .models.invites import CommunityInvite, CommunityInviteTemplate
+from .models.mapping import InstanceExtraInformation
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost
 from .models.network import FediversedInstance
 from .models.reddit import (
@@ -86,6 +88,29 @@ def send_community_invite_to_redditor(redditor_name: str, subreddit_name: str):
     with transaction.atomic():
         reddit.redditor(redditor_name).message(subject=subject, message=invite_template.message)
         CommunityInvite.objects.create(redditor=account, template=invite_template)
+
+
+@shared_task
+def get_instance_details(domain):
+    try:
+        instance = Instance.objects.get(domain=domain)
+        extra, _ = InstanceExtraInformation.objects.get_or_create(instance=instance)
+    except Instance.DoesNotExist:
+        logger.warning(f"Instance {domain} not found")
+        return
+
+    try:
+        if instance.software == AP_SERVER_SOFTWARE.lemmy:
+            client = make_ap_client()
+            response = client.get(f"{instance.url}/api/v3/site")
+            response.raise_for_status()
+            data = response.json()
+            extra.application_required = (
+                data["site_view"]["local_site"]["registration_mode"] == "RequireApplication"
+            )
+            extra.save()
+    except Exception as exc:
+        logger.exception("Failed to get instance details", extra={"exception": str(exc)})
 
 
 @shared_task
