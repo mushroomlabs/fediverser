@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.urls import reverse
+from django.views.generic.base import TemplateView
 from django.views.generic.detail import DetailView as BaseDetailView
 from django.views.generic.edit import CreateView as BaseCreateView
 from django.views.generic.list import ListView as BaseListView
@@ -128,6 +129,31 @@ class DetailView(BaseDetailView):
                 )
             )
 
+        breadcrumb_items.append(dict(url=self.request.path, label=self.breadcrumb_label))
+
+        context.update(
+            {
+                "breadcrumbs_items": breadcrumb_items,
+                "page_title": self.page_title,
+                "header_icon": self.header_icon,
+            }
+        )
+        return context
+
+
+class SimplePageView(LoginRequiredMixin, TemplateView):
+    view_name = None
+    page_title = None
+    header_icon = None
+
+    @property
+    def breadcrumb_label(self):
+        return self.page_title
+
+    def get_context_data(self, *args, **kw):
+        context = super().get_context_data(*args, **kw)
+
+        breadcrumb_items = build_breadcrumbs()
         breadcrumb_items.append(dict(url=self.request.path, label=self.breadcrumb_label))
 
         context.update(

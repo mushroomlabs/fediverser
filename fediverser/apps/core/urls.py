@@ -16,6 +16,7 @@ urlpatterns = [
     path("activity", views.UserActionListView.as_view(), name="activity-list"),
     path("instances", views.InstanceListView.as_view(), name="instance-list"),
     path("instances/create", views.InstanceCreateView.as_view(), name="instance-create"),
+    path("instances/find", views.InstanceFinderView.as_view(), name="instance-find"),
     path("instances/<str:domain>", views.InstanceDetailView.as_view(), name="instance-detail"),
     path(
         "instances/<str:domain>/signup",
