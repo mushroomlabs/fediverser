@@ -22,11 +22,19 @@ class InstanceSerializer(serializers.ModelSerializer):
 
 
 class InstanceRecommendationSerializer(serializers.ModelSerializer):
+    signup_url = serializers.SerializerMethodField()
     score = serializers.FloatField()
+
+    def get_signup_url(self, obj):
+        try:
+            assert obj.fediverser_configuration.allows_reddit_signup
+            return f"{obj.fediverser_configuration.portal_url}/reddit/connect"
+        except (AssertionError, AttributeError):
+            return f"{obj.url}/signup"
 
     class Meta:
         model = Instance
-        fields = read_only_fields = ("domain", "description", "score")
+        fields = read_only_fields = ("domain", "signup_url", "description", "score")
 
 
 class FediversedInstanceSerializer(serializers.ModelSerializer):

@@ -1,9 +1,8 @@
 from django.contrib import messages
-from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
-from django.views.generic.base import RedirectView, TemplateView
+from django.views.generic.base import TemplateView
 
-from fediverser.apps.core.models import Instance, Person
+from fediverser.apps.core.models import Person
 from fediverser.apps.lemmy.forms import (
     SetPasswordForm as LemmySetPasswordForm,
     SignupForm as LemmySignupForm,
@@ -74,16 +73,9 @@ class InstanceFinderView(SimplePageView):
     header_icon = "search"
 
 
-class InstanceSignupPageView(RedirectView):
-    def get_redirect_url(self, *args, **kw):
-        instance = get_object_or_404(Instance, domain=self.kwargs["domain"])
-        return f"{instance.url}/signup"
-
-
 __all__ = (
     "HomeView",
     "LemmySignupView",
     "LemmySetPasswordView",
     "InstanceFinderView",
-    "InstanceSignupPageView",
 )

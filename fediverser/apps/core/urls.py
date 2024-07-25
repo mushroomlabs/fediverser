@@ -16,11 +16,6 @@ urlpatterns = [
     path("instances/find", views.InstanceFinderView.as_view(), name="instance-find"),
     path("instances/<str:domain>", views.InstanceDetailView.as_view(), name="instance-detail"),
     path(
-        "instances/<str:domain>/signup",
-        views.InstanceSignupPageView.as_view(),
-        name="instance-redirect-signup",
-    ),
-    path(
         "instances/<str:domain>/recommend/category",
         views.InstanceCategoryRecommendationCreateView.as_view(),
         name="instance-categoryrecommendation-create",

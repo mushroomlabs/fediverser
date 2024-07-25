@@ -120,12 +120,12 @@
    let topRecommendation = data.shift()
 
    if (topRecommendation) {
-     const {domain, description} = topRecommendation;
+     const {domain, description, signup_url} = topRecommendation;
 
      const message = `We believe that ${domain} will be a good instance for you. Should we take you to sign up there?`
 
      if (confirm(message)) {
-       document.location = `instances/${domain}/signup`;
+       document.location = signup_url;
      }
    }
  }
