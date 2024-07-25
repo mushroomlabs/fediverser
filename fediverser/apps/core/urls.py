@@ -74,7 +74,6 @@ urlpatterns = [
         views.unsubscribe_from_subreddit,
         name="subreddit-unsubscribe",
     ),
-    path("subreddits/<str:name>/lock", views.lock_subreddit, name="subreddit-lock"),
     path(
         "subreddits/<str:name>/recommend/category",
         views.SubredditCategoryRecommendationCreateView.as_view(),

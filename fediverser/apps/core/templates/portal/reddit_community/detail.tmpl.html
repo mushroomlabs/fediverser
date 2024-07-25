@@ -10,11 +10,11 @@
 <dl>
   <dt>Subreddit Page</dt>
   <dd><a href="{{ object.full_reddit_url }}"}} target="_blank">/r/{{ object.name }}</a></dd>
-  {% if object.category %}
+  {% if object.annotation.category %}
   <dt>Category</dt>
-  <dd>{{ object.category.name }}</dd>
+  <dd>{{ object.annotation.category.name }}</dd>
   {% endif %}
-{% if object.has_recommended_alternatives %}
+{% if object.recommendations.exists %}
   <dt>Recommended Alternatives</dt>
   <dd>
     <ul>
@@ -26,7 +26,7 @@
     </ul>
   </dd>
   {% endif %}
-  {% if object.has_unresolved_community_requests and not object.locked %}
+  {% if object.has_unresolved_community_requests and not object.annotation.locked %}
   <dt>Community Creation Requests</dt>
   <dd>
     Instances that have been requested to create a community to replace /r/{{object.name }}
@@ -45,9 +45,9 @@
 <hr />
 
 
-{% if not object.locked %}
+{% if not object.annotation.locked %}
 
-{% if not object.category %}
+{% if not object.annotation.category %}
 <h3>Category</h3>
 {% if not user|pending_category_proposal:object %}
 <p>This subreddit has not been properly categorized yet. Please indicate the category which closest describe this it:</p>

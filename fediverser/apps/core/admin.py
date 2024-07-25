@@ -11,8 +11,11 @@ from .models.invites import CommunityInviteTemplate
 from .models.mapping import (
     Category,
     ChangeRequest,
+    CommunityAnnotation,
+    InstanceAnnotation,
     InstanceTopic,
     RedditToCommunityRecommendation,
+    SubredditAnnotation,
     Topic,
 )
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost, RedditMirrorStrategy
@@ -170,9 +173,35 @@ class CommunityInline(admin.TabularInline):
 
 @admin.register(Instance)
 class InstanceAdmin(admin.ModelAdmin):
+    list_display = ("domain", "status", "locked", "category")
     search_fields = ("domain",)
 
     inlines = (CommunityInline,)
+
+    @admin.display(boolean=False, description="status")
+    def status(self, obj):
+        try:
+            return obj.annotation.status
+        except AttributeError:
+            return None
+
+    @admin.display(boolean=False, description="category")
+    def category(self, obj):
+        try:
+            return obj.annotation.category
+        except AttributeError:
+            return None
+
+    @admin.display(boolean=True, description="locked")
+    def locked(self, obj):
+        try:
+            return obj.annotation.locked
+        except AttributeError:
+            return False
+
+    def get_queryset(self, *args, **kw):
+        qs = super().get_queryset(*args, **kw)
+        return qs.prefetch_related("annotation")
 
 
 @admin.register(FediversedInstance)
@@ -241,11 +270,35 @@ class FediversedInstanceAdmin(admin.ModelAdmin):
         return obj is None or obj.portal_url == app_settings.Portal.url
 
 
+class AnnotationAdmin(admin.ModelAdmin):
+    list_filter = ("status", "hidden", "locked")
+
+
+@admin.register(CommunityAnnotation)
+class CommunityAnnotationAdmin(AnnotationAdmin):
+    list_display = ("community", "status", "category", "hidden", "locked")
+    list_select_related = ("community", "category")
+    search_fields = ("community__name", "community__instance__domain")
+
+
+@admin.register(InstanceAnnotation)
+class InstanceAnnotationAdmin(AnnotationAdmin):
+    list_display = ("instance", "status", "category")
+    list_select_related = ("instance", "category")
+    search_fields = ("instance__domain",)
+
+
+@admin.register(SubredditAnnotation)
+class SubredditAnnotationAdmin(AnnotationAdmin):
+    list_display = ("subreddit", "status", "category")
+    list_select_related = ("subreddit", "category")
+    search_fields = ("subreddit__name",)
+
+
 @admin.register(Community)
 class CommunityAdmin(admin.ModelAdmin):
     list_display = ("name", "instance")
-    list_filter = ("category",)
-    list_select_related = ("instance", "category")
+    list_select_related = ("instance",)
     search_fields = ("name", "instance__domain")
     autocomplete_fields = ("instance",)
 
@@ -259,15 +312,21 @@ class RedditCommunityAdmin(admin.ModelAdmin):
 
     list_display = (
         "name",
-        "category",
-        "over18",
         "advertiser_category",
-        "locked",
         "reported_subscribers",
         "last_synced_at",
+        "over18",
+        "locked",
     )
     search_fields = ("name",)
-    actions = ("get_metadata", "fetch_new_posts")
+    actions = ("get_metadata", "fetch_new_posts", "lock_subreddits")
+
+    @admin.display(boolean=True, description="locked")
+    def locked(self, obj):
+        try:
+            return obj.annotation.locked
+        except AttributeError:
+            return False
 
     @admin.action(description="Fetch new submissions")
     def fetch_new_posts(self, request, queryset):
@@ -278,6 +337,10 @@ class RedditCommunityAdmin(admin.ModelAdmin):
     def get_metadata(self, request, queryset):
         for subreddit in queryset:
             subreddit.get_metadata()
+
+    @admin.action(description="Lock selected subreddits")
+    def lock_subreddits(self, request, queryset):
+        SubredditAnnotation.objects.filter(subreddit__in=queryset).update(locked=True)
 
 
 @admin.register(RedditToCommunityRecommendation)

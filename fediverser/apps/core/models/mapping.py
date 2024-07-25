@@ -2,8 +2,6 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django_countries.fields import CountryField
 from model_utils import Choices
@@ -14,17 +12,72 @@ from wagtail.images.models import Image
 from wagtail.snippets.models import register_snippet
 
 from .activitypub import Community, Instance
-from .common import Category
+from .common import COMMUNITY_STATUSES, INSTANCE_STATUSES, Category
 from .reddit import RedditCommunity
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class LockedItem(models.Model):
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    item = GenericForeignKey("content_type", "object_id")
+class AbstractAnnotation(models.Model):
+    """
+    Annotation entries are meant to provide metadata about the data being tracked
+    """
+
+    locked = models.BooleanField(default=False)
+    hidden = models.BooleanField(default=False)
+    notes = models.TextField()
+
+    class Meta:
+        abstract = True
+
+
+class InstanceAnnotation(AbstractAnnotation):
+    instance = models.OneToOneField(Instance, related_name="annotation", on_delete=models.CASCADE)
+    status = models.CharField(
+        max_length=20, choices=INSTANCE_STATUSES, default=INSTANCE_STATUSES.active
+    )
+
+    def __str__(self):
+        return self.instance.domain
+
+
+class CommunityAnnotation(AbstractAnnotation):
+    community = models.OneToOneField(
+        Community, related_name="annotation", on_delete=models.CASCADE
+    )
+    status = models.CharField(
+        max_length=20, choices=COMMUNITY_STATUSES, default=COMMUNITY_STATUSES.active
+    )
+    category = models.ForeignKey(
+        Category,
+        related_name="community_annotations",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
+    def __str__(self):
+        return str(self.community)
+
+
+class SubredditAnnotation(AbstractAnnotation):
+    subreddit = models.OneToOneField(
+        RedditCommunity, related_name="annotation", on_delete=models.CASCADE
+    )
+    status = models.CharField(
+        max_length=20, choices=COMMUNITY_STATUSES, default=COMMUNITY_STATUSES.active
+    )
+    category = models.ForeignKey(
+        Category,
+        related_name="subreddit_annotations",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+
+    def __str__(self):
+        return str(self.subreddit)
 
 
 @register_snippet
@@ -107,21 +160,6 @@ class ChangeRequest(StatusModel):
         self.save()
 
 
-class SetRedditCommunityCategory(ChangeRequest):
-    subreddit = models.ForeignKey(
-        RedditCommunity, related_name="category_change_requests", on_delete=models.CASCADE
-    )
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
-
-    @property
-    def description(self):
-        return f"Recommend {self.category.name} as category to {self.subreddit}"
-
-    def apply(self):
-        self.subreddit.category = self.category
-        self.subreddit.save()
-
-
 class RecommendCommunity(ChangeRequest):
     subreddit = models.ForeignKey(
         RedditCommunity, related_name="recommendation_requests", on_delete=models.CASCADE
@@ -136,6 +174,22 @@ class RecommendCommunity(ChangeRequest):
         self.subreddit.recommendations.create(community=self.community)
 
 
+class SetRedditCommunityCategory(ChangeRequest):
+    subreddit = models.ForeignKey(
+        RedditCommunity, related_name="category_change_requests", on_delete=models.CASCADE
+    )
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+
+    @property
+    def description(self):
+        return f"Recommend {self.category.name} as category to {self.subreddit}"
+
+    def apply(self):
+        SubredditAnnotation.objects.update_or_create(
+            subreddit=self.subreddit, defaults={"category": self.category}
+        )
+
+
 class SetCommunityCategory(ChangeRequest):
     community = models.ForeignKey(
         Community, related_name="category_change_requests", on_delete=models.CASCADE
@@ -147,8 +201,9 @@ class SetCommunityCategory(ChangeRequest):
         return f"Recommend category {self.category.name} to {self.community}"
 
     def apply(self):
-        self.community.category = self.category
-        self.community.save()
+        CommunityAnnotation.objects.update_or_create(
+            community=self.community, defaults={"category": self.category}
+        )
 
 
 class SetInstanceCategory(ChangeRequest):
@@ -162,8 +217,9 @@ class SetInstanceCategory(ChangeRequest):
         return f"Recommend category {self.category.name} to {self.instance}"
 
     def apply(self):
-        self.instance.category = self.category
-        self.instance.save()
+        InstanceAnnotation.objects.update_or_create(
+            instance=self.instance, defaults={"category": self.category}
+        )
 
 
 class SetInstanceCountry(ChangeRequest):
@@ -201,6 +257,9 @@ class CommunityRequest(StatusModel):
 
 
 __all__ = (
+    "InstanceAnnotation",
+    "CommunityAnnotation",
+    "SubredditAnnotation",
     "Topic",
     "InstanceCountry",
     "InstanceTopic",

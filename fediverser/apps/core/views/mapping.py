@@ -184,7 +184,7 @@ class SubredditListView(ListView):
     header_action_url = reverse_lazy("fediverser-core:subreddit-create")
 
     queryset = (
-        models.RedditCommunity.objects.exclude(hidden=True)
+        models.RedditCommunity.objects.exclude(annotation__hidden=True)
         .annotate(total_subscribers=F("metadata__subscribers"))
         .order_by("-metadata__subscribers")
     )
@@ -381,22 +381,6 @@ class CommunityFeedCreateView(CreateView):
 
 
 @csrf_exempt
-@user_passes_test(lambda u: u.is_staff)
-def lock_subreddit(request, *args, **kw):
-    name = kw["name"]
-    subreddit = get_object_or_404(models.RedditCommunity, name=name)
-
-    if request.method == "POST":
-        subreddit.locked = True
-        subreddit.save()
-    if request.method == "DELETE":
-        subreddit.locked = False
-        subreddit.save()
-
-    return HttpResponse(status=202)
-
-
-@csrf_exempt
 @user_passes_test(lambda u: u.is_authenticated)
 def subscribe_to_subreddit(request, *args, **kw):
     name = kw["name"]
@@ -444,7 +428,6 @@ __all__ = (
     "RedditCommunityListView",
     "CommunityRequestCreateView",
     "CommunityFeedCreateView",
-    "lock_subreddit",
     "subscribe_to_subreddit",
     "unsubscribe_from_subreddit",
 )

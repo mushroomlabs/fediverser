@@ -5,9 +5,9 @@
 <dl>
   <dt>Community Page</dt>
   <dd><a href="{{ object.url }}"}} target="_blank">{{ object.fqdn }}</a></dd>
-  {% if object.category %}
+  {% if object.annotation.category %}
   <dt>Category</dt>
-  <dd>{{ object.category.full_name }}</dd>
+  <dd>{{ object.annotation.category.full_name }}</dd>
   {% endif %}
 
   {% with object|subreddit_counterparts as counterparts %}
@@ -24,7 +24,7 @@
 </dl>
 <hr />
 
-{% if not object.category %}
+{% if not object.annotation.category %}
 <h3>Category</h3>
 {% if not user|pending_community_category_proposal:object %}
 <p>This community has not been properly categorized yet. Please indicate the category which closest describe it:</p>

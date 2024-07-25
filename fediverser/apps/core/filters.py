@@ -23,6 +23,7 @@ class ChangeRequestFilter(filters.FilterSet):
 class InstanceFilter(filters.FilterSet):
     country = filters.ChoiceFilter(choices=get_country_list, label="Country", method="by_country")
     topic = filters.ChoiceFilter(choices=get_topic_list, label="Interests", method="by_topic")
+    locked = filters.BooleanFilter(label="locked", field_name="annotation__locked")
 
     def by_country(self, queryset, name, value):
         return queryset.filter(related_countries__country=value)
@@ -32,10 +33,11 @@ class InstanceFilter(filters.FilterSet):
 
     class Meta:
         model = models.Instance
-        fields = ("software", "country", "topic")
+        fields = ("software", "country", "topic", "locked")
 
 
-class InstanceRecommendationFilter(InstanceFilter):
+class InstanceRecommendationFilter(filters.FilterSet):
+    country = filters.ChoiceFilter(choices=get_country_list, label="Country", method="by_country")
     topic = filters.MultipleChoiceFilter(
         choices=get_topic_list, label="Interests", method="by_topic"
     )
@@ -75,18 +77,22 @@ class InstanceRecommendationFilter(InstanceFilter):
 
 
 class CommunityFilter(filters.FilterSet):
-    instance__domain = filters.CharFilter(label="By Instance domain", lookup_expr="icontains")
+    instance = filters.CharFilter(
+        label="Instance", field_name="instance__domain", lookup_expr="icontains"
+    )
     name = filters.CharFilter(lookup_expr="icontains")
+    locked = filters.BooleanFilter(label="locked", field_name="annotation__locked")
 
     class Meta:
         model = models.Community
-        fields = ("name", "category")
+        fields = ("name", "instance", "locked")
 
 
 class RedditCommunityFilter(filters.FilterSet):
     search = filters.CharFilter(label="search", field_name="name", lookup_expr="icontains")
     mapped = filters.BooleanFilter(label="mapped", method="with_recommendations")
     subscribed = filters.BooleanFilter(label="subscribed", method="with_reddit_subscriptions")
+    locked = filters.BooleanFilter(label="locked", field_name="annotation__locked")
 
     def with_recommendations(self, queryset, name, value):
         return queryset.exclude(recommendations__isnull=value)
@@ -101,7 +107,6 @@ class RedditCommunityFilter(filters.FilterSet):
             "name",
             "subscribed",
             "mapped",
-            "category",
             "over18",
             "locked",
         )

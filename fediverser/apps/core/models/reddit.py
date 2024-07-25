@@ -17,7 +17,6 @@ from praw import Reddit
 from prawcore.exceptions import Forbidden, NotFound, UnavailableForLegalReasons
 from pythorhead.types import LanguageType
 from taggit.managers import TaggableManager
-from wagtail.admin.panels import FieldPanel
 
 from ..choices import SOURCE_CONTENT_STATUSES
 from .common import COMMUNITY_STATUSES, Category
@@ -53,31 +52,11 @@ class RejectedPost(Exception):
 
 class RedditCommunity(models.Model):
     name = models.CharField(max_length=255, unique=True)
-    category = models.ForeignKey(
-        Category,
-        related_name="subreddits",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-    )
-
     description = models.TextField(null=True, blank=True)
     over18 = models.BooleanField(default=False)
-    status = models.CharField(max_length=20, choices=COMMUNITY_STATUSES, blank=True, null=True)
     metadata = models.JSONField(null=True, blank=True)
     tags = TaggableManager(blank=True)
-    locked = models.BooleanField(default=False)
-    hidden = models.BooleanField(default=False)
-    last_synced_at = models.DateTimeField(null=True)
-
-    panels = [
-        FieldPanel("category"),
-        FieldPanel("status"),
-        FieldPanel("tags"),
-        FieldPanel("locked"),
-        FieldPanel("hidden"),
-    ]
-    autocomplete_search_field = "name"
+    last_synced_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def comments(self):

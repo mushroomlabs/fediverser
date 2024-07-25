@@ -8,9 +8,6 @@
       <th scope="col">Name</th>
       <th scope="col">Category</th>
       <th scope="col">Recommended Alternatives</th>
-      {% if user.is_staff %}
-      <th scope="col">Locked</th>
-      {% endif %}
     </tr>
   </thead>
   <tbody>
@@ -24,8 +21,8 @@
         </div>
       </td>
       <td>
-        {% if subreddit.category %}
-        {{ subreddit.category }}
+        {% if subreddit.annotation and subreddit.annotation.category %}
+        {{ subreddit.annotation.category }}
         {% else %}
         <form action="{% url 'fediverser-core:subreddit-categoryrecommendation-create' name=subreddit.name %}" method="POST" name="bulk_category_picker" novalidate>
           {% csrf_token %}
@@ -47,7 +44,7 @@
           {% for community in subreddit.candidate_communities %}
           <li><a href="{{ community.url }}" target="_blank">!{{ community.fqdn }} (Pending Review)</a></li>
           {% endfor %}
-          {% if not subreddit.locked %}
+          {% if not subreddit.annotation.locked %}
           <li>
             <a href="{% url 'fediverser-core:subreddit-alternativerecommendation-create' name=subreddit.name %}">
               Recommend a community
@@ -62,15 +59,6 @@
           {% endif %}
         </ul>
       </td>
-      {% if user.is_staff %}
-      <td>
-        <input
-            type="checkbox"
-            data-url="{% url 'fediverser-core:subreddit-lock' name=subreddit.name %}"
-            {% if subreddit.locked %}checked{% endif %}
-        />
-      </td>
-      {% endif %}
     </tr>
     {% endfor %}
   </tbody>
