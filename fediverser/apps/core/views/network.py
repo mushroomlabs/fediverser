@@ -2,7 +2,6 @@ from django.contrib.syndication.views import Feed
 from django.http import Http404
 from django.urls import reverse
 from django.utils.feedgenerator import Atom1Feed
-from django.views.generic.base import RedirectView
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 

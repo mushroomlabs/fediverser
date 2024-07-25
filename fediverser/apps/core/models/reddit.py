@@ -19,7 +19,6 @@ from pythorhead.types import LanguageType
 from taggit.managers import TaggableManager
 
 from ..choices import SOURCE_CONTENT_STATUSES
-from .common import COMMUNITY_STATUSES, Category
 
 logger = logging.getLogger(__name__)
 
