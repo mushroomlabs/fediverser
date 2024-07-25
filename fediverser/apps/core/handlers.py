@@ -3,14 +3,9 @@ import logging
 from allauth.account.signals import user_signed_up
 from allauth.socialaccount.models import SocialAccount, SocialToken
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
-from allauth.socialaccount.signals import (
-    pre_social_login,
-    social_account_added,
-    social_account_updated,
-)
+from allauth.socialaccount.signals import pre_social_login, social_account_updated
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
@@ -42,27 +37,6 @@ def on_user_signed_up_create_user_account(sender, **kw):
     UserAccount.objects.get_or_create(user=user)
 
 
-@receiver(social_account_added)
-def on_reddit_user_connected_link_user_account(sender, **kw):
-    social_login = kw["sociallogin"]
-    social_account = social_login.account
-
-    if social_account.provider == RedditProvider.id:
-        reddit_username = social_account.extra_data["name"]
-
-        reddit_account, new_redditor = RedditAccount.objects.get_or_create(
-            username=reddit_username
-        )
-
-        try:
-            user_account, _ = UserAccount.objects.update_or_create(
-                user=social_account.user, defaults={"reddit_account": reddit_account}
-            )
-        except IntegrityError:
-            logger.warning("User already is associated with different reddit account")
-            return
-
-
 @receiver(post_save, sender=LemmyMirroredPost)
 def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
     if kw["created"] and not kw["raw"]:
@@ -72,27 +46,15 @@ def on_mirrored_post_created_schedule_disclosure_post(sender, **kw):
 
 @receiver(post_save, sender=SocialAccount)
 def on_reddit_user_login_setup_accounts(sender, **kw):
+    if not app_settings.provides_automatic_lemmy_onboarding:
+        logger.info("Skip lemmy user registration")
+        return
+
     social_account = kw["instance"]
+    reddit_username = social_account.extra_data["name"]
 
     if kw["created"] and social_account.provider == RedditProvider.id:
-        reddit_username = social_account.extra_data["name"]
-
-        reddit_account, new_redditor = RedditAccount.objects.get_or_create(
-            username=reddit_username
-        )
-
-        try:
-            user_account, _ = UserAccount.objects.get_or_create(
-                reddit_account=reddit_account, user=social_account.user
-            )
-        except IntegrityError:
-            logger.warning("User already is associated with different reddit account")
-            return
-
-        if not app_settings.provides_automatic_lemmy_onboarding:
-            logger.info("Skip lemmy user registration")
-            return
-
+        user_account, _ = UserAccount.objects.get_or_create(user=social_account.user)
         if user_account.lemmy_local_user is not None:
             logger.info("User is already connected on Lemmy")
             return
@@ -116,9 +78,8 @@ def on_reddit_user_login_setup_accounts(sender, **kw):
         instance, _ = Instance.objects.get_or_create(domain=lemmy_instance.domain)
         person, _ = Person.objects.get_or_create(instance=instance, name=reddit_username)
 
-        ConnectedRedditAccount.objects.get_or_create(reddit_account=reddit_account, actor=person)
         redditor_migrated.send_robust(
-            sender=ConnectedRedditAccount, reddit_account=reddit_account, activitypub_actor=person
+            sender=RedditAccount, reddit_username=reddit_username, activitypub_actor=person
         )
 
 
@@ -205,13 +166,15 @@ def on_instance_created_get_extra_information(sender, **kw):
         tasks.get_instance_details.delay(instance.domain)
 
 
-@receiver(redditor_migrated, sender=ConnectedRedditAccount)
+@receiver(redditor_migrated)
 def on_migrated_reddit_account_publish_entry(sender, **kw):
     our_instance = FediversedInstance.current()
-    reddit_account = kw["reddit_account"]
+    reddit_username = kw["reddit_username"]
     actor = kw["activitypub_actor"]
 
-    connection, _ = ConnectedRedditAccount.objects.get_or_create(
-        reddit_account=reddit_account, actor=actor
+    reddit_account, _ = RedditAccount.objects.get_or_create(username=reddit_username)
+
+    ConnectedRedditAccount.objects.create(reddit_account=reddit_account, actor=actor)
+    ConnectedRedditAccountEntry.objects.create(
+        published_by=our_instance, reddit_account=reddit_account, actor=actor
     )
-    ConnectedRedditAccountEntry.objects.create(published_by=our_instance, connection=connection)

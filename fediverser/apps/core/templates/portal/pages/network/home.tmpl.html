@@ -6,7 +6,6 @@
 {% include "portal/partials/home_header.tmpl.html" with title=page_title subtitle=page_subtitle action_url=header_action_url action_text=header_action_label icon=None  %}
 {% endblock %}
 
-
 {% block main_content %}
 {% if not user.is_authenticated %}
 <section>

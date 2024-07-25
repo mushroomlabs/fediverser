@@ -1,9 +1,8 @@
 {% extends "portal/base.tmpl.html" %}
 {% load i18n wagtailadmin_tags %}
 
-{% block content %}
+{% block main_content %}
 {% block before_form %}{% endblock %}
-<div class="nice-padding">
 <form action="{{ action_url }}" method="POST" novalidate{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
   {% csrf_token %}
 
@@ -33,7 +32,6 @@
     </li>
   </ul>
 </form>
-</div>
 {% endblock %}
 
 {% block extra_js %}

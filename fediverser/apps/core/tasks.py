@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from fediverser.apps.lemmy.services import LemmyClientRateLimited, LocalUserProxy
+from fediverser.apps.lemmy.services import InstanceProxy, LemmyClientRateLimited, LocalUserProxy
 
 from .choices import AutomaticSubmissionPolicies
 from .models.activitypub import Community, Instance, make_ap_client
@@ -42,10 +42,11 @@ def post_mirror_disclosure(mirrored_post_id):
 @shared_task
 def clone_redditor(reddit_username, as_bot=True):
     try:
-        reddit_account = RedditAccount.objects.get(username=reddit_username)
-        reddit_account.register_mirror(as_bot=as_bot)
-    except RedditAccount.DoesNotExist:
-        logger.warning("Could not find reddit account")
+        mirror_instance = InstanceProxy.get_connected_instance()
+        assert mirror_instance is not None, "no connected Lemmy instance"
+        mirror_instance.register(username=reddit_username, as_bot=as_bot)
+    except AssertionError as exc:
+        logger.info(exc)
 
 
 @shared_task

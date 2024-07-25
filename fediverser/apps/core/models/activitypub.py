@@ -5,7 +5,7 @@ from django.db import models
 from pythorhead.types import LanguageType
 
 from fediverser.apps.lemmy.models import Community as LemmyCommunity, Language
-from fediverser.apps.lemmy.services import InstanceProxy
+from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 
 from .common import AP_SERVER_SOFTWARE, Category, make_http_client
 
@@ -156,6 +156,15 @@ class Person(models.Model, ActorMixin):
     instance = models.ForeignKey(Instance, related_name="users", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     url = models.URLField(unique=True)
+
+    @classmethod
+    def make_from_lemmy_local_user(cls, local_user: LocalUserProxy):
+        url = f"https://{local_user.person.instance.domain}/u/{local_user.person.name}"
+        instance, _ = Instance.objects.get_or_create(domain=local_user.person.instance.domain)
+        person, _ = cls.objects.get_or_create(
+            instance=instance, name=local_user.person.name, defaults={"url": url}
+        )
+        return person
 
     @classmethod
     def fetch(cls, url):

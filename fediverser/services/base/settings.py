@@ -109,26 +109,6 @@ SITE_NAME = env.str("FEDIVERSER_SITE_NAME", default="Fediverser Portal")
 WAGTAIL_SITE_NAME = SITE_NAME
 FEDIVERSER_ENABLE_LEMMY_INTEGRATION = env.bool("FEDIVERSER_ENABLE_LEMMY", default=True)
 
-FEDIVERSER = {
-    "URL": env.str("FEDIVERSER_PORTAL_URL", default=None),
-    "NAME": SITE_NAME,
-    "HUB_URL": env.str("FEDIVERSER_HUB_URL", default="https://fediverser.network"),
-    "REDDIT_SIGNUP_ENABLED": env.bool("FEDIVERSER_ENABLE_REDDIT_SIGNUP", default=True),
-    "GLOBAL_LEMMY_INSTANCE_LOCATOR": env.bool(
-        "FEDIVERSER_GLOBAL_LEMMY_INSTANCE_LOCATOR", default=False
-    ),
-}
-
-FEDIVERSED_LEMMY = (
-    {
-        "INSTANCE_DOMAIN": env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None),
-        "BOT_USERNAME": env.str("FEDIVERSER_BOT_USERNAME", default=None),
-        "BOT_PASSWORD": env.str("FEDIVERSER_BOT_PASSWORD", default=None),
-    }
-    if FEDIVERSER_ENABLE_LEMMY_INTEGRATION
-    else {}
-)
-
 
 # Cache
 CACHES = {

@@ -195,13 +195,6 @@ def has_pending_community_status_change_request(user, community):
 
 
 @register.filter
-def is_subscriber(user, subreddit_name):
-    return RedditCommunity.objects.filter(
-        name__iexact=subreddit_name, redditaccount__portal_account__user=user
-    ).exists()
-
-
-@register.filter
 def is_ambassador(user, community):
     return (
         user.is_authenticated

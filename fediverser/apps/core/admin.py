@@ -44,8 +44,8 @@ class ReadOnlyMixin:
 
 @admin.register(UserAccount)
 class UserAccountAdmin(admin.ModelAdmin):
-    list_display = ("username", "reddit_account", "lemmy_local_username")
-    list_select_related = ("user", "reddit_account")
+    list_display = ("username", "lemmy_local_username")
+    list_select_related = ("user",)
 
     @admin.display(boolean=False, description="username")
     def username(self, obj):
@@ -283,8 +283,11 @@ class CommunityAnnotationAdmin(AnnotationAdmin):
 
 @admin.register(InstanceAnnotation)
 class InstanceAnnotationAdmin(AnnotationAdmin):
-    list_display = ("instance", "status", "category")
-    list_select_related = ("instance", "category")
+    list_display = (
+        "instance",
+        "status",
+    )
+    list_select_related = ("instance",)
     search_fields = ("instance__domain",)
 
 
@@ -364,7 +367,7 @@ class RedditAccountAdmin(admin.ModelAdmin):
     )
     list_filter = ("suspended", "blocked", "marked_as_spammer", "marked_as_bot")
     search_fields = ("username",)
-    actions = ("create_lemmy_mirror", "mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
+    actions = ("mark_as_spammer", "unflag_as_spammer", "mark_as_bot")
     autocomplete_fields = ("subreddits",)
     readonly_fields = ("subreddits", "username")
 
@@ -379,11 +382,6 @@ class RedditAccountAdmin(admin.ModelAdmin):
     @admin.action(description="Mark as bot account")
     def mark_as_bot(self, request, queryset):
         return queryset.update(marked_as_bot=True)
-
-    @admin.action(description="Create account on Lemmy Mirror Instance")
-    def create_lemmy_mirror(self, request, queryset):
-        for account in queryset:
-            account.register_mirror()
 
 
 @admin.register(RedditMirrorStrategy)

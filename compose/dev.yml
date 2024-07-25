@@ -22,6 +22,7 @@ x-fediverser-web-service-envvars: &fediverser-service-envvars
   FEDIVERSER_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
   FEDIVERSER_SECRET_KEY: base-fediverser-secret-key
   FEDIVERSER_DEBUG: "true"
+  FEDIVERSER_PORTAL_OPEN_REGISTRATIONS: "true"
   IPYTHONDIR: /tmp/ipython
 
 x-fediversed-lemmy-envvars: &fediverser-lemmy-envvars

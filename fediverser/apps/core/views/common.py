@@ -3,12 +3,46 @@ from django.core.paginator import Paginator
 from django.urls import reverse
 from django.views.generic.base import TemplateView
 from django.views.generic.detail import DetailView as BaseDetailView
-from django.views.generic.edit import CreateView as BaseCreateView
+from django.views.generic.edit import CreateView as BaseCreateView, FormView as BaseFormView
 from django.views.generic.list import ListView as BaseListView
 
 
 def build_breadcrumbs():
     return [dict(url=reverse("fediverser-core:portal-home"), label="Home")]
+
+
+class FormView(LoginRequiredMixin, BaseFormView):
+    template_name = "portal/generic/form.tmpl.html"
+    view_name = None
+    breadcrumb_label = None
+    page_title = None
+    page_subtitle = None
+    header_icon = None
+    submit_button_label = "Submit"
+
+    @property
+    def action_url(self):
+        return self.view_name and reverse(self.view_name)
+
+    def get_context_data(self, *args, **kw):
+        context = super().get_context_data(*args, **kw)
+
+        breadcrumb_items = build_breadcrumbs()
+
+        if self.action_url and self.breadcrumb_label:
+            breadcrumb_items.append(dict(url=self.action_url, label=self.breadcrumb_label))
+
+        context.update(
+            {
+                "breadcrumbs_items": breadcrumb_items,
+                "page_title": self.page_title,
+                "page_subtitle": self.page_subtitle,
+                "header_icon": self.header_icon,
+                "action_url": self.action_url,
+                "submit_button_label": self.submit_button_label,
+            }
+        )
+        return context
 
 
 class CreateView(LoginRequiredMixin, BaseCreateView):

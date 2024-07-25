@@ -1,0 +1,7 @@
+{% extends "portal/generic/form.tmpl.html" %}
+{% load fediverser %}
+
+{% block before_form %}
+{% fediversed_lemmy as fediversed_lemmy_configuration %}
+<p>Please fill the form below to complete your registration on {{ fediversed_lemmy_configuration.instance.domain }}.</p>
+{% endblock %}

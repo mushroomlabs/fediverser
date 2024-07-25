@@ -4,24 +4,25 @@ import environ
 from allauth.socialaccount.models import SocialApp
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
 from django.conf import settings
-from django.test.signals import setting_changed
 
 logger = logging.getLogger(__name__)
 env = environ.Env()
 environ.Env.read_env()
 
-_SETTINGS_KEY = "FEDIVERSER"
-
 
 class AppSettings:
     class Portal:
-        url = None
-        name = "Fediverser Portal"
+        url = env.str("FEDIVERSER_PORTAL_URL", default=None)
+        name = settings.SITE_NAME
         open_registrations = env.bool("FEDIVERSER_PORTAL_OPEN_REGISTRATIONS", default=False)
-        default_hub_url = "https://fediverser.network"
-        signup_with_reddit = True
-        global_lemmy_instance_selector = False
-        accepts_community_requests = False
+        hub_url = env.str("FEDIVERSER_HUB_URL", default="https://fediverser.network")
+        signup_with_reddit = env.bool("FEDIVERSER_ENABLE_REDDIT_SIGNUP", default=True)
+        global_lemmy_instance_selector = env.bool(
+            "FEDIVERSER_GLOBAL_LEMMY_INSTANCE_LOCATOR", default=False
+        )
+        accepts_community_requests = env.bool(
+            "FEDIVERSER_ENABLE_ANONYMOUS_COMMUNITY_REQUESTS", default=False
+        )
 
     class Reddit:
         mirroring_enabled = False
@@ -67,41 +68,5 @@ class AppSettings:
     def is_network_portal(self):
         return not self.is_local_portal
 
-    def __init__(self):
-        self.load()
-
-    def load(self):
-        ATTRS = {
-            "URL": (self.Portal, "url"),
-            "NAME": (self.Portal, "name"),
-            "HUB_URL": (self.Portal, "default_hub_url"),
-            "ACCEPTS_COMMUNITY_REQUESTS": (self.Portal, "accepts_community_requests"),
-            "GLOBAL_LEMMY_INSTANCE_LOCATOR": (self.Portal, "global_lemmy_instance_selector"),
-            "REDDIT_SIGNUP_ENABLED": (self.Portal, "signup_with_reddit"),
-            "REDDIT_MIRRORING_ENABLED": (self.Reddit, "mirroring_enabled"),
-            "REDDIT_BOT_USERNAME": (self.Reddit, "bot_username"),
-            "REDDIT_BOT_PASSWORD": (self.Reddit, "bot_password"),
-        }
-        user_settings = getattr(settings, _SETTINGS_KEY, {})
-
-        for setting, value in user_settings.items():
-            logger.debug(f"setting {setting} -> {value}")
-            if setting not in ATTRS:
-                logger.warning(f"Ignoring {setting} as it is not a setting for ActivityPub")
-                continue
-
-            setting_class, attr = ATTRS[setting]
-            setattr(setting_class, attr, value)
-
 
 app_settings = AppSettings()
-
-
-def reload_settings(*args, **kw):
-    global app_settings
-    setting = kw["setting"]
-    if setting == _SETTINGS_KEY:
-        app_settings.load()
-
-
-setting_changed.connect(reload_settings)

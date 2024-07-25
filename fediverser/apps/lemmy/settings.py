@@ -1,51 +1,25 @@
 import logging
 
-from django.conf import settings
-from django.test.signals import setting_changed
+import environ
 
 logger = logging.getLogger(__name__)
-
-_SETTINGS_KEY = "FEDIVERSED_LEMMY"
+env = environ.Env()
+environ.Env.read_env()
 
 
 class AppSettings:
     class Instance:
-        domain = None
-        reddit_mirror_bots_enabled = False
+        domain = env.str("FEDIVERSER_CONNECTED_LEMMY_INSTANCE", default=None)
+        reddit_mirror_bots_enabled = env.bool("REDDIT_MIRROR_BOTS_ENABLED", default=False)
 
     class Bot:
-        username = None
-        password = None
+        username = env.str("FEDIVERSER_BOT_USERNAME", default=None)
+        password = env.str("FEDIVERSER_BOT_PASSWORD", default=None)
 
-    def __init__(self):
-        self.load()
-
-    def load(self):
-        ATTRS = {
-            "INSTANCE_DOMAIN": (self.Instance, "domain"),
-            "REDDIT_MIRROR_BOTS_ENABLED": (self.Instance, "reddit_mirror_bots_enabled"),
-            "BOT_USERNAME": (self.Bot, "username"),
-            "BOT_PASSWORD": (self.Bot, "password"),
-        }
-        user_settings = getattr(settings, _SETTINGS_KEY, {})
-
-        for setting, value in user_settings.items():
-            if setting not in ATTRS:
-                logger.warning(f"Ignoring {setting} as it is not a setting for Fediversed Lemmy")
-                continue
-
-            setting_class, attr = ATTRS[setting]
-            setattr(setting_class, attr, value)
+    @property
+    def integration_enabled(self):
+        enabled = env.bool("FEDIVERSER_ENABLE_LEMMY", default=True)
+        return enabled and self.Instance.domain is not None
 
 
 app_settings = AppSettings()
-
-
-def reload_settings(*args, **kw):
-    global app_settings
-    setting = kw["setting"]
-    if setting == _SETTINGS_KEY:
-        app_settings.load()
-
-
-setting_changed.connect(reload_settings)

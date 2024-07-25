@@ -117,11 +117,19 @@ class LocalUserProxy(models.LocalUser):
     def instance_domain(self):
         return self.person.instance.domain
 
+    @property
+    def has_set_password(self):
+        return self.password_encrypted != self.UNUSABLE_PASSWORD
+
     def __str__(self):
         return self.person.name
 
+    def set_password(self, password):
+        self.password_encrypted = get_hashed_password(password)
+        self.save()
+
     def check_password(self, cleartext):
-        if self.password_encrypted == self.UNUSABLE_PASSWORD:
+        if not self.has_set_password:
             return False
         return bcrypt.checkpw(cleartext.encode(), self.password_encrypted.encode())
 

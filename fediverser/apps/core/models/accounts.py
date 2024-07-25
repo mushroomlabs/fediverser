@@ -6,28 +6,16 @@ from fediverser.apps.lemmy.services import LocalUserProxy
 from .activitypub import Community, Person
 from .feeds import CommunityFeed
 from .mapping import ChangeRequest
-from .network import FediversedInstance
-from .reddit import RedditAccount, RedditCommunity
+from .reddit import RedditCommunity
 
 
 class UserAccount(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, related_name="account", on_delete=models.CASCADE
     )
-    reddit_account = models.OneToOneField(
-        RedditAccount,
-        related_name="portal_account",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-    )
     community_feeds = models.ManyToManyField(CommunityFeed)
     lemmy_local_username = models.CharField(max_length=255, unique=True, null=True, blank=True)
     tracked_subreddits = models.ManyToManyField(RedditCommunity)
-
-    def get_recommended_portal(self):
-        our_instance = FediversedInstance.current()
-        return our_instance.trusted_instances.exclude(instance=None).order_by("?").first()
 
     @property
     def recommended_communities(self):
@@ -44,10 +32,6 @@ class UserAccount(models.Model):
         return self.connected_activitypub_accounts.exists()
 
     @property
-    def can_migrate_from_reddit(self):
-        return self.reddit_account is not None and not self.has_connected_activitypub_accounts
-
-    @property
     def lemmy_client(self):
         lemmy_user = self.lemmy_local_user
         return lemmy_user and lemmy_user.make_lemmy_client()
@@ -58,6 +42,10 @@ class UserAccount(models.Model):
             return None
 
         return LocalUserProxy.objects.filter(person__name=self.lemmy_local_username).first()
+
+    @property
+    def connected_social_accounts(self):
+        return self.user.socialaccount_set.all()
 
     def check_lemmy_password(self, cleartext):
         return bool(self.lemmy_local_user) and self.lemmy_local_user.check_password(cleartext)

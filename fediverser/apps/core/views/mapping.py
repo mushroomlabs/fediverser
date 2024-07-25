@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import F, Q, Value
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
@@ -23,6 +23,7 @@ class SubredditCreateView(CreateView):
     model = models.RedditCommunity
     form_class = forms.SubredditCreateForm
     template_name = "portal/reddit_community/create.tmpl.html"
+    page_title = "Add Subreddit"
 
     def get_success_url(self, *args, **kw):
         return reverse("fediverser-core:subreddit-list", kwargs=self.kwargs)
@@ -32,6 +33,7 @@ class CommunityCreateView(CreateView):
     model = models.Community
     form_class = forms.CommunityCreateForm
     template_name = "portal/community/create.tmpl.html"
+    page_title = "Add Community"
 
     def get_success_url(self, *args, **kw):
         return reverse("fediverser-core:community-list", kwargs=self.kwargs)
@@ -41,6 +43,7 @@ class InstanceCreateView(CreateView):
     model = models.Instance
     form_class = forms.InstanceCreateForm
     template_name = "portal/instance/create.tmpl.html"
+    page_title = "Add Instance"
 
     def get_success_url(self, *args, **kw):
         return reverse("fediverser-core:instance-list", kwargs=self.kwargs)
@@ -126,8 +129,15 @@ class SubredditAlternativeRecommendationCreateView(CreateView):
         return models.RedditCommunity.objects.get(name__iexact=self.kwargs["name"])
 
     def get_context_data(self, *args, **kw):
+        subreddit = self.get_subreddit()
         context = super().get_context_data(*args, **kw)
-        context.update({"subreddit": self.get_subreddit()})
+        context.update(
+            {
+                "subreddit": subreddit,
+                "page_title": "Recommend Subreddit",
+                "page_subtitle": subreddit.name,
+            }
+        )
         return context
 
     def form_valid(self, form):
@@ -325,15 +335,24 @@ class CommunityRequestCreateView(CreateView):
     form_class = forms.CommunityRequestForm
     page_title = "Community Request"
     view_name = "fediverser-core:subreddit-communityrequest-create"
+    template_name = "portal/community_proposal/create.tmpl.html"
 
     def get_success_url(self, *args, **kw):
         return reverse("fediverser-core:subreddit-detail", kwargs=self.kwargs)
 
+    def get_subreddit(self):
+        return models.RedditCommunity.objects.get(name__iexact=self.kwargs["name"])
+
+    def get_context_data(self, *args, **kw):
+        context = super().get_context_data(*args, **kw)
+        subreddit = self.get_subreddit()
+
+        context.update({"page_subtitle": subreddit.name})
+        return context
+
     def form_valid(self, form):
         form.instance.requested_by = self.request.user
-        form.instance.subreddit = models.RedditCommunity.objects.get(
-            name__iexact=self.kwargs["name"]
-        )
+        form.instance.subreddit = self.get_subreddit()
         return super().form_valid(form)
 
 
