@@ -8,21 +8,12 @@ from fediverser.apps.lemmy.forms import (
     SignupForm as LemmySignupForm,
 )
 
-from ..settings import app_settings
 from ..signals import redditor_migrated
 from .common import FormView, SimplePageView
 
 
 class HomeView(TemplateView):
-    @property
-    def is_local(self):
-        return app_settings.is_local_portal
-
-    def get_template_names(self):
-        local = "portal/pages/local/home.tmpl.html"
-        network = "portal/pages/network/home.tmpl.html"
-
-        return [local] if self.is_local else [network]
+    template_name = "portal/home/page.tmpl.html"
 
 
 class LemmySignupView(FormView):
@@ -69,7 +60,7 @@ class LemmySetPasswordView(FormView):
 
 class InstanceFinderView(SimplePageView):
     page_title = "Instance Finder"
-    template_name = "portal/pages/network/instance_finder.tmpl.html"
+    template_name = "portal/home/instance_finder.tmpl.html"
     header_icon = "search"
 
 

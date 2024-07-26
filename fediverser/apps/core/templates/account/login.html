@@ -4,7 +4,7 @@
 {% block bodyclass %}login{% endblock %}
 
 {% block furniture %}
-{% fediverser_portal_settings as portal_settings %}
+{% fediverser_portal_settings as site %}
 <main class="content-wrapper" id="main">
   <h1>
     {% block branding_login %}
@@ -33,7 +33,7 @@
 
   <div class="login-form">
     {% block login_form %}
-    {% if portal_settings.open_registrations %}
+    {% if site.Portal.open_registrations %}
     {% url 'account_login' as login_url %}
     {% element form form=form method="post" action=login_url tags="entrance,login" %}
     {% slot body %}

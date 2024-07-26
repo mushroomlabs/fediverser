@@ -412,7 +412,6 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
         "is_duplicate",
     )
     list_filter = (
-        "subreddit",
         "status",
         "quarantined",
         "removed",
@@ -454,7 +453,9 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
     def fetch_from_reddit(self, request, queryset):
         for reddit_submission in queryset:
             RedditSubmission.make(
-                subreddit=reddit_submission.subreddit, post=reddit_submission.praw_object
+                subreddit=reddit_submission.subreddit,
+                post=reddit_submission.praw_object,
+                make_comments=True,
             )
 
     @admin.action(description="Post Submission to Lemmy")

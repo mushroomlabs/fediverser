@@ -221,7 +221,7 @@ class InstanceListView(ListView):
     header_action_label = "Add new Instance"
     header_action_url = reverse_lazy("fediverser-core:instance-create")
 
-    queryset = models.Instance.objects.exclude(extra__abandoned=True)
+    queryset = models.Instance.objects.exclude(annotation__hidden=True).order_by("id")
 
 
 class InstanceDetailView(DetailView):

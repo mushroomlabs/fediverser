@@ -83,7 +83,7 @@ services:
       timeout: 30s
       retries: 50
     volumes:
-      - broker-data:/data
+      - hub-broker-data:/data
 
   hub-cache:
     <<: [*internal-service, *fediverser-development]

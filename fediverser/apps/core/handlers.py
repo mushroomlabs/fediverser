@@ -14,7 +14,7 @@ from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 from . import tasks
 from .models.accounts import UserAccount
 from .models.activitypub import Instance, Person
-from .models.feeds import Feed
+from .models.feeds import Entry, Feed
 from .models.mapping import RedditToCommunityRecommendation
 from .models.mirroring import LemmyMirroredPost
 from .models.network import (
@@ -23,7 +23,13 @@ from .models.network import (
     FediversedInstance,
     RedditToCommunityRecommendationEntry,
 )
-from .models.reddit import RedditAccount, RedditCommunity, make_reddit_user_client
+from .models.reddit import (
+    RedditAccount,
+    RedditCommunity,
+    RedditSubmission,
+    make_reddit_client,
+    make_reddit_user_client,
+)
 from .settings import app_settings
 from .signals import redditor_migrated
 
@@ -124,6 +130,18 @@ def on_reddit_account_updated_save_access_token(sender, **kw):
     )
 
 
+@receiver(m2m_changed, sender=UserAccount.tracked_subreddits.through)
+def on_subreddit_added_create_rss_feed(sender, **kw):
+    action = kw["action"]
+    if action == "post_add" and not kw["reverse"]:
+        for subreddit_id in kw["pk_set"]:
+            subreddit = RedditCommunity.objects.filter(id=subreddit_id).first()
+            if not subreddit:
+                continue
+            feed_url = f"https://reddit.com/r/{subreddit.name}/hot.rss"
+            tasks.fetch_feed.delay(feed_url)
+
+
 @receiver(m2m_changed, sender=RedditAccount.subreddits.through)
 def on_subreddit_added_subscribe_to_corresponding_community(sender, **kw):
     if not settings.FEDIVERSER_ENABLE_LEMMY_INTEGRATION:
@@ -146,6 +164,22 @@ def on_feed_created_fetch_entries(sender, **kw):
     if kw["created"]:
         feed = kw["instance"]
         tasks.fetch_feed.delay(feed_url=feed.url)
+
+
+@receiver(post_save, sender=Entry)
+def on_reddit_feed_entry_get_submission(sender, **kw):
+    entry = kw["instance"]
+
+    if kw["created"] and entry.reddit_submission_id:
+        reddit_name = entry.subreddit_name
+
+        subreddit = RedditCommunity.objects.filter(
+            name__iexact=reddit_name
+        ).first() or RedditCommunity.fetch(reddit_name)
+
+        client = make_reddit_client()
+        post = client.submission(entry.reddit_submission_id)
+        RedditSubmission.make(subreddit=subreddit, post=post)
 
 
 @receiver(post_save, sender=RedditToCommunityRecommendation)

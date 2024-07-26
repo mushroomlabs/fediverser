@@ -368,7 +368,7 @@ class RedditSubmission(AbstractRedditItem):
             raise RejectedPost(str(exc))
 
     @classmethod
-    def make(cls, subreddit: RedditCommunity, post: praw.models.Submission):
+    def make(cls, subreddit: RedditCommunity, post: praw.models.Submission, make_comments=False):
         def get_date(timestamp):
             return timestamp and make_aware(datetime.datetime.fromtimestamp(timestamp))
 
@@ -403,16 +403,17 @@ class RedditSubmission(AbstractRedditItem):
                 ),
             )
 
-            # Remove all "more comments" from the tree of comments. Reasons:
-            # - Avoid extra requests on posts with hellthreads.
-            # - We don't really care about hellthreads
-            # - Most posts with lots of comments are usually "daily discussion", not to repost.
-            # - If we are pulling in (near) real-time, there will be few comments anyway
-            # - When we get a "new" comment deep in the tree, it builds the whole ancestry anyway.
+            if make_comments:
+                # Remove all "more comments" from the tree of comments. Reasons:
+                # - Avoid extra requests on posts with hellthreads.
+                # - We don't really care about hellthreads
+                # - Most posts with lots of comments are usually "daily discussion", not to repost.
+                # - If we are pulling in (near) real-time, there will be few comments anyway
+                # - "new" comments deep in the tree will build the whole ancestry anyway.
 
-            post.comments.replace_more(limit=0)
-            for comment in post.comments:
-                make_comment_thread(submission=submission, comment=comment, parent=None)
+                post.comments.replace_more(limit=0)
+                for comment in post.comments:
+                    make_comment_thread(submission=submission, comment=comment, parent=None)
             return submission
         except DataError:
             logger.warning("Failed to make reddit submission", extra={"post_url": post.url})

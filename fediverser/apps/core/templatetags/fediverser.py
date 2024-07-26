@@ -1,3 +1,5 @@
+import datetime
+
 from django import template
 from django.db.models import Q
 from django.urls import reverse
@@ -213,6 +215,22 @@ def has_pending_ambassador_application(user, community):
 
 
 @register.filter
+def homepage_submissions(user):
+    if user.is_authenticated:
+        subreddits = user.account.tracked_subreddits.all()
+    else:
+        subreddits = RedditCommunity.objects.exclude(over18=True)
+    now = timezone.now()
+    cutoff = now - datetime.timedelta(hours=12)
+
+    return (
+        RedditSubmission.repostable.filter(modified__gte=cutoff, subreddit__in=subreddits)
+        .select_related("subreddit", "author")
+        .order_by("-modified")[:50]
+    )
+
+
+@register.filter
 def latest_feed_entries(community):
     now = timezone.now()
     cutoff = now - Entry.MAX_AGE
@@ -258,7 +276,7 @@ def fediversed_lemmy():
 
 @register.simple_tag
 def fediverser_portal_settings():
-    return app_settings.Portal
+    return app_settings
 
 
 @register.simple_tag

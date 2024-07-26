@@ -1,11 +1,20 @@
 {% extends "portal/base.tmpl.html" %}
 {% load fediverser wagtailadmin_tags %}
 
+
+{% block main_header %}
+{% fediverser_portal_settings as site %}
+{% include "portal/home/header.tmpl.html" with title=site.name subtitle=None action_url=None action_text=None icon=None  %}
+{% endblock %}
+
+
+
 {% block main_content %}
+{% fediverser_portal_settings as site %}
 {% if not user.is_authenticated %}
+<h1 class="w-header__title">Welcome to {{ site.name }}</h1>
 {% fediversed_lemmy as fediversed_lemmy_configuration %}
-{% if fediversed_lemmy_configuration.allows_reddit_signup %}
-<h1 class="w-header__title">Welcome to {% site_name %}</h1>
+{% if site.provides_automatic_lemmy_onboarding %}
 <section>
   <h3>One-click migration from Reddit to {{ fediversed_lemmy_configuration.instance.domain }}</h3>
   <p>
@@ -26,6 +35,7 @@
 </section>
 
 {% else %}
+{% if site.provides_automatic_lemmy_onboarding %}
 {% with user.account.lemmy_local_user as lemmy_user %}
 {% if lemmy_user is None %}
 <div class="help-block help-warning">
@@ -43,6 +53,7 @@
 </div>
 {% endif %}
 {% endwith %}
+{% endif %}
 
 <h1 class="w-header__title">Welcome, {{ user }}</h1>
 <section class="w-summary" aria-labelledby="header-title">
@@ -62,5 +73,33 @@
     </li>
   </ul>
 </section>
+
+{% with user|homepage_submissions as submissions %}
+{% if submissions.exists %}
+<section>
+  <table class="listing listing--inline-actions">
+    <thead>
+      <tr>
+        <th scope="col">Title</th>
+        <th scope="col">Source</th>
+        <th scope="col">Published On</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for submission in submissions %}
+      <tr>
+        <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
+        <td><a href="{% url 'fediverser-core:subreddit-detail' submission.subreddit.id %}">{{ submission.subreddit }}</a></td>
+        <td>{{ submission.modified|naturaltime }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<p>You can browse through the subreddits and communities we have on our database. The more you help, the easier it gets for everyone to migrate!</p>
+{% endif %}
+{% endwith %}
+
 {% endif %}
 {% endblock %}

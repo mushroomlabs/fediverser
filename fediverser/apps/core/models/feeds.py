@@ -1,5 +1,7 @@
 import datetime
 import logging
+import re
+from functools import cached_property
 
 import feedparser
 from django.contrib.humanize.templatetags.humanize import naturaltime
@@ -87,7 +89,7 @@ class Feed(TimeStampedModel):
 class Entry(TimeStampedModel):
     MAX_AGE = datetime.timedelta(days=7)
 
-    feed = models.ForeignKey(Feed, on_delete=models.PROTECT)
+    feed = models.ForeignKey(Feed, related_name="entries", on_delete=models.CASCADE)
     link = models.URLField(unique=True)
     title = models.TextField(null=True, blank=True)
     guid = models.CharField(max_length=500, null=True, blank=True, db_index=True)
@@ -96,6 +98,26 @@ class Entry(TimeStampedModel):
 
     def __str__(self):
         return self.link
+
+    @cached_property
+    def reddit_post_regex_match(self):
+        return re.match(
+            r".*reddit.com/r/(?P<reddit_name>\w+)/comments/(?P<post_id>\w+)/.*", self.link
+        )
+
+    @property
+    def is_reddit_post(self):
+        return self.reddit_post_regex_match is not None
+
+    @property
+    def reddit_submission_id(self):
+        regex_match = self.reddit_post_regex_match
+        return regex_match and regex_match.group("post_id")
+
+    @property
+    def subreddit_name(self):
+        regex_match = self.reddit_post_regex_match
+        return regex_match and regex_match.group("reddit_name")
 
     @classmethod
     def make(cls, entry, feed):

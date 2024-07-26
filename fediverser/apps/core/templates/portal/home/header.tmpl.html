@@ -1,0 +1,15 @@
+{% extends "portal/partials/header.tmpl.html" %}
+{% load wagtailadmin_tags fediverser %}
+
+{% block right_column %}
+{% fediverser_portal_settings as site %}
+{% if site.is_network_portal %}
+<div class="actionbutton">
+  {% if user.is_authenticated and not user.account.has_connected_activitypub_accounts %}
+  <a href="{% url 'fediverser-core:instance-find' %}" class="button bicolor button--icon">
+    {% icon name='search' wrapped=1 %}Find a Lemmy Instance
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
