@@ -176,7 +176,7 @@ class UserActionListView(LoginRequiredMixin, ListView):
     def get_base_queryset(self):
         return (
             models.ChangeRequest.objects.filter(requester=self.request.user)
-            .order_by("status_changed")
+            .order_by("-status_changed")
             .select_subclasses()
         )
 
