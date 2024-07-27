@@ -89,7 +89,7 @@
     {% for submission in submissions %}
       <tr>
         <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
-        <td><a href="{% url 'fediverser-core:subreddit-detail' submission.subreddit.id %}">{{ submission.subreddit }}</a></td>
+        <td><a href="{% url 'fediverser-core:subreddit-detail' submission.subreddit.name %}">{{ submission.subreddit }}</a></td>
         <td>{{ submission.modified|naturaltime }}</td>
       </tr>
       {% endfor %}
