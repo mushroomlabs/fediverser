@@ -95,18 +95,7 @@ class CommunityCreateForm(forms.ModelForm):
 
     def save(self, *args, **kw):
         url = self.cleaned_data["url"]
-        parsed_url = urlparse(url)
-        domain = parsed_url.hostname
-        community_name = parsed_url.path.split("/")[-1].lower()
-        server_type = self.instance_info["software"]["name"]
-
-        instance, _ = models.Instance.objects.get_or_create(
-            domain=domain, defaults={"software": server_type}
-        )
-        community, _ = models.Community.objects.get_or_create(
-            instance=instance, name=community_name
-        )
-        return community
+        return models.Community.fetch(url)
 
     class Meta:
         model = models.Community
