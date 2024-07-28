@@ -1,14 +1,14 @@
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import F, Q, Value
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics
 
-from .. import forms, models, serializers
+from .. import forms, models, serializers, tasks
 from ..filters import (
     ChangeRequestFilter,
     CommunityFilter,
@@ -114,7 +114,11 @@ class SubredditDetailView(DetailView):
         return context
 
     def get_object(self):
-        return self.model.objects.get(name__iexact=self.kwargs["name"])
+        try:
+            return self.model.objects.get(name__iexact=self.kwargs["name"])
+        except self.model.DoesNotExist:
+            tasks.fetch_subreddit.delay(self.kwargs["name"])
+            raise Http404("Subreddit not found")
 
 
 class SubredditAlternativeRecommendationCreateView(CreateView):

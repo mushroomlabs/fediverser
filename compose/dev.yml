@@ -5,11 +5,6 @@ x-lemmy-service: &lemmy-service
   networks:
     - internal
 
-x-public-service: &public-service
-  networks:
-    - default
-    - internal
-
 x-internal-service: &internal-service
   networks:
     - internal
@@ -63,14 +58,6 @@ x-webapp: &fediverser-webservice
   command: poetry run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir=/app/fediverser --reload-include *.html
 
 services:
-  cloudflared:
-    <<: *public-service
-    image: cloudflare/cloudflared
-
-    volumes:
-      - cloudflared-credentials-data:/etc/cloudflared
-      - cloudflared-config-data:/home/nonroot/.cloudflared
-
   db:
     <<: *fediverser-development
     restart: unless-stopped
@@ -310,18 +297,3 @@ volumes:
       type: none
       o: bind
       device: "${FEDIVERSER_LEMMY_MEDIA_MOUNT_PATH?Variable not set}"
-
-
-  cloudflared-credentials-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: "${FEDIVERSER_CLOUDFLARE_CREDENTIALS_PATH?Variable not set}"
-
-  cloudflared-config-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: "${FEDIVERSER_CLOUDFLARE_CONFIG_PATH?Variable not set}"

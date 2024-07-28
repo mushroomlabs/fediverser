@@ -115,6 +115,11 @@ def get_instance_details(domain):
 
 
 @shared_task
+def fetch_subreddit(subreddit_name):
+    RedditCommunity.fetch(subreddit_name)
+
+
+@shared_task
 def fetch_new_posts(subreddit_name):
     try:
         subreddit = RedditCommunity.objects.get(name=subreddit_name)

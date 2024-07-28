@@ -98,8 +98,19 @@ class RedditCommunityFilter(filters.FilterSet):
         return queryset.exclude(recommendations__isnull=value)
 
     def with_reddit_subscriptions(self, queryset, name, value):
+        if not self.request.user.is_authenticated:
+            return queryset
         action = queryset.filter if value else queryset.exclude
         return action(useraccount__user=self.request.user)
+
+    @property
+    def qs(self):
+        queryset = super().qs
+        if "subscribed" not in self.data and self.request.user.is_authenticated:
+            queryset = queryset.filter(useraccount__user=self.request.user)
+        if "over18" not in self.data:
+            queryset = queryset.exclude(over18=True)
+        return queryset
 
     class Meta:
         model = models.RedditCommunity
