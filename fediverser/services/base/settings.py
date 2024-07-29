@@ -111,11 +111,17 @@ FEDIVERSER_ENABLE_LEMMY_INTEGRATION = env.bool("FEDIVERSER_ENABLE_LEMMY", defaul
 
 
 # Cache
+CACHE_BACKEND = env.str("FEDIVERSER_CACHE_BACKEND", default="django_redis.cache.RedisCache")
+CACHE_OPTIONS = (
+    {"CLIENT_CLASS": "django_redis.client.DefaultClient"}
+    if CACHE_BACKEND.startswith("django_redis")
+    else {}
+)
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
+        "BACKEND": CACHE_BACKEND,
         "LOCATION": env.str("FEDIVERSER_CACHE_LOCATION", default="redis://redis:6379/1"),
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "OPTIONS": CACHE_OPTIONS,
     }
 }
 

@@ -25,4 +25,10 @@ class CommunityViewTestCase(BaseTestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class SignupViewTestCase(BaseTestCase):
+    def test_anonymous_user_can_see_page(self):
+        response = self.client.get("/accounts/signup/")
+        self.assertEqual(response.status_code, 200)
+
+
 __all__ = ("CommunityViewTestCase",)
