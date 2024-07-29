@@ -1,6 +1,7 @@
 services:
   cloudflared:
     image: cloudflare/cloudflared
+    user: root:root
     command: tunnel run fediverser-dev
     networks:
       - default
