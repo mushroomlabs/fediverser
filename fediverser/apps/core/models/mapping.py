@@ -147,6 +147,10 @@ class ChangeRequest(StatusModel):
     def description(self):
         return f"Change request #{self.id} {self.__class__.__name__}"
 
+    @property
+    def auto_accept(self):
+        return self.requester.is_staff
+
     def apply(self):
         raise NotImplementedError("Child classes need to implement this method")
 

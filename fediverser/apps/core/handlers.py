@@ -15,7 +15,14 @@ from . import tasks
 from .models.accounts import UserAccount
 from .models.activitypub import Instance, Person
 from .models.feeds import Entry, Feed
-from .models.mapping import RedditToCommunityRecommendation
+from .models.mapping import (
+    RecommendCommunity,
+    RedditToCommunityRecommendation,
+    SetCommunityCategory,
+    SetInstanceCategory,
+    SetInstanceCountry,
+    SetRedditCommunityCategory,
+)
 from .models.mirroring import LemmyMirroredPost
 from .models.network import (
     ConnectedRedditAccount,
@@ -198,6 +205,17 @@ def on_instance_created_get_extra_information(sender, **kw):
     if kw["created"]:
         instance = kw["instance"]
         tasks.get_instance_details.delay(instance.domain)
+
+
+@receiver(post_save, sender=RecommendCommunity)
+@receiver(post_save, sender=SetRedditCommunityCategory)
+@receiver(post_save, sender=SetCommunityCategory)
+@receiver(post_save, sender=SetInstanceCategory)
+@receiver(post_save, sender=SetInstanceCountry)
+def on_change_request_created_check_auto_accepted(sender, **kw):
+    instance = kw["instance"]
+    if kw["created"] and instance.auto_accept:
+        instance.accept()
 
 
 @receiver(redditor_migrated)
