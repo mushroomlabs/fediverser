@@ -4,7 +4,7 @@
 
 {% block main_header %}
 {% fediverser_portal_settings as site %}
-{% include "portal/home/header.tmpl.html" with title=site.name subtitle=None action_url=None action_text=None icon=None  %}
+{% include "portal/home/header.tmpl.html" with title=site.Portal.name subtitle=None action_url=None action_text=None icon=None  %}
 {% endblock %}
 
 
@@ -12,7 +12,6 @@
 {% block main_content %}
 {% fediverser_portal_settings as site %}
 {% if not user.is_authenticated %}
-<h1 class="w-header__title">Welcome to {{ site.name }}</h1>
 {% fediversed_lemmy as fediversed_lemmy_configuration %}
 {% if site.provides_automatic_lemmy_onboarding %}
 <section>
