@@ -26,6 +26,7 @@ from .models.network import (
 )
 from .models.reddit import (
     RedditAccount,
+    RedditApplicationKey,
     RedditComment,
     RedditCommunity,
     RedditSubmission,
@@ -351,6 +352,12 @@ class RedditToCommunityRecommendationAdmin(admin.ModelAdmin):
     list_display = ("subreddit", "community")
     list_select_related = ("subreddit", "community")
     search_fields = ("subreddit__name", "community__name", "community__instance__domain")
+
+
+@admin.register(RedditApplicationKey)
+class RedditApplicationKeyAdmin(admin.ModelAdmin):
+    list_display = ("owner", "client_id")
+    autocomplete_fields = ("owner",)
 
 
 @admin.register(RedditAccount)

@@ -3,6 +3,7 @@ import logging
 from typing import Optional
 
 import praw
+from allauth.socialaccount.models import SocialToken
 from django.conf import settings
 from django.db import models
 from django.db.models import Max, Q
@@ -499,4 +500,48 @@ class RedditComment(AbstractRedditItem):
         return reddit_comment
 
 
-__all__ = ("RedditAccount", "RedditSubmission", "RedditComment", "RedditCommunity")
+class RedditApplicationKey(models.Model):
+    client_id = models.CharField(max_length=32)
+    client_secret = models.CharField(max_length=32)
+    password = models.CharField(max_length=60, null=True, blank=True)
+    owner = models.ForeignKey(
+        RedditAccount, related_name="application_keys", on_delete=models.CASCADE
+    )
+
+    @property
+    def client(self):
+        params = dict(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            user_agent=settings.REDDIT_USER_AGENT,
+        )
+        token = SocialToken.objects.filter(
+            account__provider="reddit", account__uid=self.owner.username
+        ).first()
+
+        if self.password is not None:
+            params.update({"username": self.owner.username, "password": self.password})
+
+        if token is not None:
+            params.update({"refresh_token": token.token_secret})
+        return Reddit(**params)
+
+
+class RedditModerator(models.Model):
+    subreddit = models.ForeignKey(
+        RedditCommunity, related_name="moderators", on_delete=models.CASCADE
+    )
+    account = models.ForeignKey(RedditAccount, related_name="moderates", on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ("subreddit", "account")
+
+
+__all__ = (
+    "RedditAccount",
+    "RedditSubmission",
+    "RedditComment",
+    "RedditCommunity",
+    "RedditApplicationKey",
+    "RedditModerator",
+)
