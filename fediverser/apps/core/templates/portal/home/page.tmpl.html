@@ -81,6 +81,7 @@
       <tr>
         <th scope="col">Title</th>
         <th scope="col">Source</th>
+        <th scope="col">Author</th>
         <th scope="col">Published On</th>
       </tr>
     </thead>
@@ -89,6 +90,11 @@
       <tr>
         <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
         <td><a href="{% url 'fediverser-core:subreddit-detail' submission.subreddit.name %}">{{ submission.subreddit }}</a></td>
+        <td>
+          <a href="{% url 'fediverser-core:redditor-detail' username=submission.author.username %}">
+            {{ submission.author }}
+          </a>
+        </td>
         <td>{{ submission.modified|naturaltime }}</td>
       </tr>
       {% endfor %}

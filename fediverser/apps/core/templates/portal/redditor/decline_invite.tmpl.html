@@ -1,0 +1,13 @@
+{% extends "portal/generic/form.tmpl.html" %}
+{% load fediverser %}
+
+{% block before_form %}
+{% fediverser_portal_settings as site %}
+<p>
+  We at {{ site.Portal.name }} are committed to help get people out of legacy social networks and into the <a href="https://fediverse.party" target="_blank">party of the Open Social Web</a>. However, we understand that this might not be for everyone. Please fill in the form below to decline our invite and we will not be sending any more messages.
+</p>
+{% endblock %}
+
+{% block actions %}
+<input type="submit" value="Submit" class="button" />
+{% endblock %}

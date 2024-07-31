@@ -1,18 +1,125 @@
 import logging
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.generic.base import RedirectView
+from invitations.adapters import get_invitations_adapter
+from invitations.app_settings import app_settings as invitations_settings
+from invitations.views import AcceptInvite
 
+from .. import tasks
+from ..forms import RedditorDeclinedInviteForm
 from ..models.accounts import CommunityAmbassadorApplication
 from ..models.activitypub import Community
+from ..models.invites import RedditorInvite
 from ..models.mirroring import LemmyMirroredPost
-from ..models.reddit import RedditSubmission
-from .common import CreateView
+from ..models.reddit import RedditAccount, RedditSubmission
+from .common import AnonymousSurveyView, CreateView
 
 logger = logging.getLogger(__name__)
+
+
+class RedditorAcceptInviteView(AcceptInvite):
+    def post(self, *args, **kw):
+        self.object = invitation = self.get_object()
+
+        # No invitation was found.
+        if not invitation:
+            # Newer behavior: show an error message and redirect.
+            get_invitations_adapter().add_message(
+                self.request,
+                messages.ERROR,
+                "invitations/messages/invite_invalid.txt",
+            )
+            return redirect(invitations_settings.LOGIN_REDIRECT)
+
+        # The invitation was previously accepted, redirect to the login
+        # view.
+        if invitation.accepted:
+            get_invitations_adapter().add_message(
+                self.request,
+                messages.ERROR,
+                "invites/already_accepted.tmpl.txt",
+                {"redditor": invitation.redditor},
+            )
+            # Redirect to login since there's hopefully an account already.
+            return redirect(invitations_settings.LOGIN_REDIRECT)
+
+        # The key was expired.
+        if invitation.key_expired():
+            get_invitations_adapter().add_message(
+                self.request,
+                messages.ERROR,
+                "invites/expired.tmpl.txt",
+                {"redditor": invitation.redditor},
+            )
+            # Redirect to sign-up since they might be able to register anyway.
+            return redirect(self.get_signup_redirect())
+
+        # The invitation is valid.
+
+        return redirect(reverse("fediverser-core:reddit-login"))
+
+    def get_queryset(self):
+        return RedditorInvite.objects.all()
+
+
+class RedditorDeclineInviteView(AnonymousSurveyView):
+    form_class = RedditorDeclinedInviteForm
+    page_title = "Decline Invite"
+    template_name = "portal/redditor/decline_invite.tmpl.html"
+
+    @property
+    def action_url(self):
+        invite = self.get_invite()
+        return reverse("fediverser-core:redditor-decline-invite", kwargs={"key": invite.key})
+
+    def get_invite(self):
+        return get_object_or_404(RedditorInvite, key=self.kwargs["key"])
+
+    def get_success_url(self, *args, **kw):
+        invite = self.get_invite()
+        return reverse(
+            "fediverser-core:redditor-detail", kwargs={"username": invite.redditor.username}
+        )
+
+    def get_context_data(self, *args, **kw):
+        context = super().get_context_data(*args, **kw)
+
+        context.update({"invite": self.get_invite()})
+        return context
+
+    def form_valid(self, form):
+        invite = self.get_invite()
+
+        form.instance.redditor = invite.redditor
+        form.instance.key = invite.key
+        form.save()
+
+        messages.info(
+            self.request,
+            "Your invite declination was recorded. You will not receive any further messages on Reddit from us",
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class RedditorInviteView(CreateView):
+    model = RedditorInvite
+    page_title = "Invite Redditor"
+    view_name = "fediverser-core:redditor-send-invite"
+
+    def get_success_url(self, *args, **kw):
+        return reverse("fediverser-core:redditor-detail", kwargs=self.kwargs)
+
+    def post(self, request, *args, **kw):
+        redditor = get_object_or_404(RedditAccount, **self.kwargs)
+
+        invite = RedditorInvite.create(redditor=redditor, inviter=self.request.user)
+        tasks.send_invite_to_redditor.delay(invite.id)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class CommunityAmbassadorApplicationCreateView(CreateView):
@@ -61,4 +168,10 @@ class CommunityRepostRedditSubmissionView(LoginRequiredMixin, RedirectView):
         return f"{create_post_url}?{query_string}"
 
 
-__all__ = ("CommunityAmbassadorApplicationCreateView", "CommunityRepostRedditSubmissionView")
+__all__ = (
+    "CommunityAmbassadorApplicationCreateView",
+    "CommunityRepostRedditSubmissionView",
+    "RedditorAcceptInviteView",
+    "RedditorDeclineInviteView",
+    "RedditorInviteView",
+)

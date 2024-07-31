@@ -43,6 +43,7 @@ THIRD_PARTY_APPS = (
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.reddit",
+    "invitations",
     "rest_framework",
     "modelcluster",
     "taggit",
@@ -201,6 +202,10 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_PRESERVE_USERNAME_CASING = False
 
 ACCOUNT_FORMS = {"signup": "fediverser.apps.core.forms.SignupForm"}
+
+ACCOUNT_ADAPTER = "invitations.models.InvitationsAdapter"
+INVITATIONS_ADAPTER = ACCOUNT_ADAPTER
+INVITATIONS_GONE_ON_ACCEPT_ERROR = False
 
 SOCIALACCOUNT_ADAPTER = "fediverser.apps.core.adapters.FediverserSocialAccountAdapter"
 SOCIALACCOUNT_PROVIDERS = {

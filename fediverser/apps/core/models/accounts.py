@@ -1,12 +1,14 @@
+from allauth.socialaccount.models import SocialAccount, SocialToken
 from django.conf import settings
 from django.db import models
 
+from fediverser.apps.core.settings import app_settings
 from fediverser.apps.lemmy.services import LocalUserProxy
 
 from .activitypub import Community, Person
 from .feeds import CommunityFeed
 from .mapping import ChangeRequest
-from .reddit import RedditCommunity
+from .reddit import RedditCommunity, RedditOAuthScopes, make_reddit_user_client
 
 
 class UserAccount(models.Model):
@@ -47,8 +49,29 @@ class UserAccount(models.Model):
     def connected_social_accounts(self):
         return self.user.socialaccount_set.all()
 
+    @property
+    def can_send_reddit_private_messages(self):
+        return self.user.socialaccount_set.filter(
+            reddit_scopes__scope=RedditOAuthScopes.CREATE_PRIVATE_MESSAGES
+        ).exists()
+
+    def get_reddit_client(self):
+        social_token = SocialToken.objects.filter(account__user=self.user).first()
+
+        return social_token and make_reddit_user_client(
+            social_application=app_settings.reddit_social_application,
+            refresh_token=social_token.token_secret,
+        )
+
     def check_lemmy_password(self, cleartext):
         return bool(self.lemmy_local_user) and self.lemmy_local_user.check_password(cleartext)
+
+
+class RedditAccountAuthorizedScope(models.Model):
+    social_account = models.ForeignKey(
+        SocialAccount, related_name="reddit_scopes", on_delete=models.CASCADE
+    )
+    scope = models.CharField(max_length=32, choices=RedditOAuthScopes.choices)
 
 
 class ConnectedActivityPubAccount(models.Model):
@@ -88,4 +111,5 @@ __all__ = (
     "CommunityAmbassador",
     "CommunityAmbassadorApplication",
     "ConnectedActivityPubAccount",
+    "RedditAccountAuthorizedScope",
 )

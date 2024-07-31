@@ -1,0 +1,4 @@
+{% load i18n %}
+{% autoescape off %}
+{% blocktrans %}The invitation for {{ redditor.username }} has expired.{% endblocktrans %}
+{% endautoescape %}

@@ -3,7 +3,11 @@ import logging
 from allauth.account.signals import user_signed_up
 from allauth.socialaccount.models import SocialAccount, SocialToken
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
-from allauth.socialaccount.signals import pre_social_login, social_account_updated
+from allauth.socialaccount.signals import (
+    pre_social_login,
+    social_account_added,
+    social_account_updated,
+)
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models.signals import m2m_changed, post_save
@@ -120,6 +124,23 @@ def on_reddit_token_provider_get_subreddits(sender, **kw):
         except RedditCommunity.DoesNotExist:
             subreddit = RedditCommunity.objects.create(name=subreddit_name)
         reddit_account.subreddits.add(subreddit)
+
+
+@receiver(social_account_added)
+@receiver(social_account_updated)
+def on_reddit_token_provider_update_authorized_scopes(sender, **kw):
+    social_login = kw["sociallogin"]
+
+    social_account = social_login.account
+    social_token = social_login.token
+    social_application = app_settings.reddit_social_application
+
+    reddit = make_reddit_user_client(
+        social_application=social_application, refresh_token=social_token.token_secret
+    )
+
+    for scope in reddit.auth.scopes():
+        social_account.reddit_scopes.get_or_create(scope=scope)
 
 
 @receiver(social_account_updated)

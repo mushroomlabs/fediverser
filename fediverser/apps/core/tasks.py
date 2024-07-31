@@ -3,9 +3,10 @@ import logging
 import random
 
 from celery import shared_task
-from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 
 from fediverser.apps.lemmy.services import InstanceProxy, LemmyClientRateLimited, LocalUserProxy
@@ -14,18 +15,12 @@ from .choices import AutomaticSubmissionPolicies
 from .models.activitypub import Community, Instance, make_ap_client
 from .models.common import AP_SERVER_SOFTWARE
 from .models.feeds import Entry, Feed
-from .models.invites import CommunityInvite, CommunityInviteTemplate
+from .models.invites import RedditorInvite
 from .models.mapping import InstanceExtraInformation
 from .models.mirroring import LemmyMirroredComment, LemmyMirroredPost
 from .models.network import FediversedInstance
-from .models.reddit import (
-    RedditAccount,
-    RedditComment,
-    RedditCommunity,
-    RedditSubmission,
-    RejectedPost,
-    make_reddit_client,
-)
+from .models.reddit import RedditComment, RedditCommunity, RedditSubmission, RejectedPost
+from .settings import app_settings
 
 logger = logging.getLogger(__name__)
 
@@ -61,34 +56,44 @@ def subscribe_to_community(lemmy_local_user_id, community_id):
         logger.warning("Could not find lemmy user")
 
 
-def send_community_invite_to_redditor(redditor_name: str, subreddit_name: str):
+def send_invite_to_redditor(invite_id):
     try:
-        account = RedditAccount.objects.get(username=redditor_name)
-        subreddit = RedditCommunity.objects.get(name=subreddit_name)
-        community = Community.objects.get(invite_templates__subreddit=subreddit)
+        invite = RedditorInvite.objects.get(id=invite_id)
+        inviter = invite.inviter
 
-        assert settings.REDDIT_BOT_ACCOUNT_USERNAME is not None, "reddit bot is not set up"
-        assert settings.REDDIT_BOT_ACCOUNT_PASSWORD is not None, "reddit bot has no password"
+        assert inviter.account.can_send_reddit_private_messages, "can not send DMs"
 
-        reddit = make_reddit_client(
-            username=settings.REDDIT_BOT_ACCOUNT_USERNAME,
-            password=settings.REDDIT_BOT_ACCOUNT_PASSWORD,
-        )
+        reddit = inviter.account.get_reddit_client()
 
-    except (RedditAccount.DoesNotExist, RedditCommunity.DoesNotExist, Community.DoesNotExist):
+        assert reddit is not None, "Could not get reddit client"
+
+    except RedditorInvite.DoesNotExist:
         logger.warning("Could not find target for invite")
         return
-
     except AssertionError as exc:
         logger.warning(str(exc))
         return
 
-    invite_template = CommunityInviteTemplate.objects.get(community=community, subreddit=subreddit)
-    subject = f"Invite to join {community.name} community on Lemmy"
+    subject = f"Invite to join {app_settings.Portal.name}"
+    invite_accept_url = reverse(
+        "fediverser-core:redditor-accept-invite", kwargs={"key": invite.key}
+    )
+    invite_decline_url = reverse(
+        "fediverser-core:redditor-decline-invite", kwargs={"key": invite.key}
+    )
+
+    message = render_to_string(
+        "invites/direct_message.tmpl.md",
+        context={
+            "invite_accept_url": f"{app_settings.Portal.url}{invite_accept_url}",
+            "invite_decline_url": f"{app_settings.Portal.url}{invite_decline_url}",
+        },
+    )
 
     with transaction.atomic():
-        reddit.redditor(redditor_name).message(subject=subject, message=invite_template.message)
-        CommunityInvite.objects.create(redditor=account, template=invite_template)
+        reddit.redditor(invite.redditor.username).message(subject=subject, message=message)
+        invite.sent = timezone.now()
+        invite.save()
 
 
 @shared_task

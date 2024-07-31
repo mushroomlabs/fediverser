@@ -11,7 +11,7 @@ def build_breadcrumbs():
     return [dict(url=reverse("fediverser-core:portal-home"), label="Home")]
 
 
-class FormView(LoginRequiredMixin, BaseFormView):
+class FormViewMixin(BaseFormView):
     template_name = "portal/generic/form.tmpl.html"
     view_name = None
     breadcrumb_label = None
@@ -43,6 +43,14 @@ class FormView(LoginRequiredMixin, BaseFormView):
             }
         )
         return context
+
+
+class FormView(LoginRequiredMixin, FormViewMixin):
+    pass
+
+
+class AnonymousSurveyView(FormViewMixin):
+    pass
 
 
 class CreateView(LoginRequiredMixin, BaseCreateView):
@@ -81,6 +89,7 @@ class ListView(BaseListView):
     filterset_class = None
     header_action_label = None
     header_action_url = None
+    template_name = "portal/generic/listing.tmpl.html"
 
     def get_filter_set_kwargs(self):
         return {

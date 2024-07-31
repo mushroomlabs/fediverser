@@ -6,6 +6,16 @@ app_name = "fediverser-core"
 
 urlpatterns = [
     path("", views.HomeView.as_view(), name="portal-home"),
+    path(
+        "reddit/invites/<str:key>/accept",
+        views.RedditorAcceptInviteView.as_view(),
+        name="redditor-accept-invite",
+    ),
+    path(
+        "reddit/invites/<str:key>/decline",
+        views.RedditorDeclineInviteView.as_view(),
+        name="redditor-decline-invite",
+    ),
     path("reddit/connect", views.RedditConnectionView.as_view(), name="reddit-connection-setup"),
     path("reddit/login", views.RedditLoginView.as_view(), name="reddit-login"),
     path("lemmy/connect", views.LemmySignupView.as_view(), name="lemmy-connect-setup"),
@@ -81,6 +91,13 @@ urlpatterns = [
         "subreddits/<str:name>/request/community",
         views.CommunityRequestCreateView.as_view(),
         name="subreddit-communityrequest-create",
+    ),
+    path("redditors", views.RedditorListView.as_view(), name="redditor-list"),
+    path("redditors/<str:username>", views.RedditorDetailView.as_view(), name="redditor-detail"),
+    path(
+        "redditors/<str:username>/invite",
+        views.RedditorInviteView.as_view(),
+        name="redditor-send-invite",
     ),
     path(
         "api/community-requests",

@@ -11,6 +11,7 @@ from django_countries.fields import CountryField
 from . import models
 from .models.activitypub import AP_SERVER_SOFTWARE
 from .models.feeds import CommunityFeed, Feed
+from .models.invites import RedditorDeclinedInvite
 
 logger = logging.getLogger(__name__)
 
@@ -205,3 +206,9 @@ class CommunityFeedForm(forms.ModelForm):
     class Meta:
         model = CommunityFeed
         fields = ("feed",)
+
+
+class RedditorDeclinedInviteForm(forms.ModelForm):
+    class Meta:
+        model = RedditorDeclinedInvite
+        fields = ("reason", "note")

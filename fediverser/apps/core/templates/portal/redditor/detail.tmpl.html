@@ -1,0 +1,40 @@
+{% extends "portal/base.tmpl.html" %}
+{% load humanize fediverser %}
+
+{% block main_header %}
+{% include "portal/redditor/header.tmpl.html" with title=page_title subtitle=page_subtitle action_url=header_action_url action_text=header_action_label icon=header_icon redditor=object %}
+{% endblock %}
+
+
+{% block main_content %}
+<dl>
+  <dt>Reddit Page</dt>
+  <dd><a href="{{ object.reddit_view_url }}"}} target="_blank">{{ object }}</a></dd>
+  <dt>Joined</dt>
+  <dd>{{ object.created|naturaltime }}</dd>
+  <dt>Migration status</dt>
+  <dd>
+    {% if object|has_joined_portal %}
+    Migrated
+    {% elif object|has_pending_invites %}
+    Invite was sent, but has not responded yet.
+    {% else %}
+    Not migrated.
+    {% endif %}
+  </dd>
+  <dt>Fediverse identities</dt>
+  <dd>
+    {% for connection in object.connected_activitypub_accounts.all %}
+    {{ connection.actor.url }}
+    {% empty %}
+    No Fediverse identity connected, yet.
+    {% endfor %}
+  </dd>
+</dl>
+
+<hr />
+
+<p>
+
+</p>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "portal/partials/header.tmpl.html" %}
+{% load wagtailadmin_tags fediverser %}
+
+{% block right_column %}
+{% if user.is_authenticated and redditor|should_be_invited %}
+<div class="actionbutton">
+  {% if user.account.can_send_reddit_private_messages %}
+  <form action="{% url 'fediverser-core:redditor-send-invite' redditor.username %}" method="POST" novalidate>
+    {% csrf_token %}
+
+    <button class="button bicolor button--icon">
+      {% icon name="mail" wrapped=1 %}
+      Send Invite to {{ redditor }}
+    </button>
+  </form>
+  {% else %}
+  <a class="button bicolor button--icon" href="{% url 'fediverser-core:reddit-connection-setup' %}?scope=privatemessages&next={% url 'fediverser-core:redditor-detail' redditor.username %}">
+    {% icon name="mail" wrapped=1 %}
+    Send Invite to {{ redditor }}
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

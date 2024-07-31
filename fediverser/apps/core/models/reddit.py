@@ -50,6 +50,38 @@ class RejectedPost(Exception):
     pass
 
 
+class RedditOAuthScopes(models.TextChoices):
+    SPEND_GOLD = ("creddits", "Spend reddit gold creddits")
+    CREATE_SUBMISSION = ("submit", "Submit Content")
+    CREATE_PRIVATE_MESSAGES = ("privatemessages", "Private Messages")
+    CREATE_REPORT = ("report", "Report content")
+    MODERATOR_NOTES = ("modnote", "Mod Note")
+    MODERATOR_USERS = ("modcontributors", "Approve and ban users")
+    MODERATOR_EMAIL = ("modmail", "New Modmail")
+    MODERATOR_SUBREDDIT = ("modconfig", "Moderate Subreddit Configuration")
+    MODERATE_POSTS = ("modposts", "Moderate Posts")
+    MODERATE_FLAIR = ("modflair", "Moderate Flair")
+    MODERATE_OTHER_MODERATORS = ("modothers", "Invite or remove other moderators")
+    MODERATE_TRAFFIC = ("modtraffic", "Subreddit Traffic")
+    MODERATE_WIKI = ("modwiki", "Moderate Wiki")
+    MODERATE_SELF = ("modself", "Make changes to your subreddit moderator and contributor status")
+    EDIT_ACCOUNT = ("account", "Update account information")
+    EDIT_SUBMISSION = ("edit", "Edit Posts")
+    EDIT_SUBSCRIPTIONS = ("subscribe", "Edit My Subscriptions")
+    EDIT_STYLE = ("structuredstyles", "Edit structured styles")
+    EDIT_WIKI = ("wikiedit", "Wiki Editing")
+    READ_CONTENT = ("read", "Read Content")
+    READ_WIKI = ("wikiread", "Read Wiki Pages")
+    VIEW_SUBSCRIPTIONS = ("mysubreddits", "My Subreddits")
+    VIEW_MODERATOR_LOG = ("modlog", "Moderation Log")
+    VIEW_IDENTITY = ("identity", "My Identity")
+    VIEW_HISTORY = ("history", "History")
+    SAVE = ("save", "Save Content")
+    FLAIR = ("flair", "Manage My Flair")
+    VOTE = ("vote", "Vote")
+    ADMIN_LIVE_THREADS = ("livemanage", "Manage live threads")
+
+
 class RedditCommunity(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(null=True, blank=True)

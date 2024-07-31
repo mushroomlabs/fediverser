@@ -9,6 +9,7 @@ from wagtailautocomplete.urls.admin import urlpatterns as autocomplete_admin_url
 urlpatterns = [
     path("_ui/", include(wagtailadmin_urls)),  # We are using UI components from wagtail
     path("accounts/", include("allauth.urls")),
+    path("invitations/", include("invitations.urls", namespace="invitations")),
     path("autocomplete/", include(autocomplete_admin_urls)),
     path("login/", RedirectView.as_view(url="/accounts/login/"), name="login-redirect"),
     path("", include("fediverser.apps.core.urls", namespace="fediverser-core")),

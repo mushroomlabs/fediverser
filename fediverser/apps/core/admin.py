@@ -4,10 +4,10 @@ from django.db.models import Count
 from fediverser.apps.lemmy.services import LemmyClientRateLimited
 
 from . import tasks
-from .models.accounts import UserAccount
+from .models.accounts import RedditAccountAuthorizedScope, UserAccount
 from .models.activitypub import Community, Instance
 from .models.feeds import CommunityFeed, Entry, Feed
-from .models.invites import CommunityInviteTemplate
+from .models.invites import InviteTemplate, RedditorInvite
 from .models.mapping import (
     Category,
     ChangeRequest,
@@ -54,6 +54,16 @@ class UserAccountAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RedditAccountAuthorizedScope)
+class RedditAccountAuthorizedScopesAdmin(admin.ModelAdmin):
+    list_display = ("username", "scope")
+    list_filter = ("scope",)
+
+    @admin.display(boolean=False, description="User name")
+    def username(self, obj):
+        return obj.social_account.uid
 
 
 @admin.register(Feed)
@@ -545,11 +555,15 @@ class RedditCommentAdmin(ReadOnlyMixin, admin.ModelAdmin):
         return queryset.update(marked_as_spam=False)
 
 
-@admin.register(CommunityInviteTemplate)
-class CommunityInviteTemplateAdmin(admin.ModelAdmin):
-    list_display = ("subreddit", "community")
-    list_filter = ("subreddit", "community")
-    autocomplete_fields = ("subreddit", "community")
+@admin.register(InviteTemplate)
+class InviteTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "message")
+
+
+@admin.register(RedditorInvite)
+class RedditorInviteAdmin(admin.ModelAdmin):
+    list_display = ("redditor", "sent", "accepted")
+    list_filter = ("accepted",)
 
 
 @admin.register(LemmyMirroredComment)

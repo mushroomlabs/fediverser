@@ -1,5 +1,6 @@
 import datetime
 
+from allauth.socialaccount.models import SocialAccount
 from django import template
 from django.db.models import Q
 from django.urls import reverse
@@ -10,6 +11,7 @@ from wagtail.admin.ui import sidebar
 from wagtail.telepath import JSContext, adapter
 
 from fediverser.apps.core.models.feeds import Entry
+from fediverser.apps.core.models.invites import RedditorDeclinedInvite
 from fediverser.apps.core.models.mapping import ChangeRequest, InstanceCountry, Topic
 from fediverser.apps.core.models.network import FediversedInstance
 from fediverser.apps.core.models.reddit import RedditCommunity, RedditSubmission
@@ -252,6 +254,37 @@ def submissions_from_related_subreddits(community):
 @register.filter
 def subreddit_counterparts(community):
     return RedditCommunity.objects.filter(recommendations__community=community)
+
+
+@register.filter
+def should_be_invited(redditor):
+    return all(
+        [
+            not is_on_fediverse(redditor),
+            not has_declined_invite(redditor),
+            not has_joined_portal(redditor),
+        ]
+    )
+
+
+@register.filter
+def is_on_fediverse(redditor):
+    return redditor.connected_activitypub_accounts.exists()
+
+
+@register.filter
+def has_declined_invite(redditor):
+    return RedditorDeclinedInvite.objects.filter(redditor=redditor).exists()
+
+
+@register.filter
+def has_pending_invites(redditor):
+    return redditor.invites.filter(accepted=False).exists()
+
+
+@register.filter
+def has_joined_portal(redditor):
+    return SocialAccount.objects.filter(provider="reddit", uid=redditor.username).exists()
 
 
 @register.simple_tag
