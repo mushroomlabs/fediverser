@@ -101,7 +101,7 @@ class RedditorDeclineInviteView(AnonymousSurveyView):
 
         messages.info(
             self.request,
-            "Your invite declination was recorded. You will not receive any further messages on Reddit from us",
+            "Your invite declination was recorded. No DMs will be sent to you on Reddit",
         )
         return HttpResponseRedirect(self.get_success_url())
 
