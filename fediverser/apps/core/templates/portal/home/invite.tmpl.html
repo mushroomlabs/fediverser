@@ -1,0 +1,37 @@
+{% extends "portal/base.tmpl.html" %}
+{% load fediverser wagtailadmin_tags %}
+
+
+{% block main_header %}
+{% fediverser_portal_settings as site %}
+{% include "portal/home/header.tmpl.html" with title=site.Portal.name subtitle=None action_url=None action_text=None icon=None  %}
+{% endblock %}
+
+
+{% block main_content %}
+{% fediverser_portal_settings as site %}
+<section>
+  <p>
+    Congrats! You are one click away from joining our ranks of people who are
+    tired of social media networks controlled by soulless
+    corporations. By joining now, you'll be able to:
+  </p>
+
+  <ul>
+{% if site.provides_automatic_lemmy_onboarding %}
+    <li>
+      Get your account on our <a href="https://join-lemmy.org">Lemmy</a> instance
+      and automatically import your favorite subreddits
+    </li>
+{% endif %}
+    <li>Help build the most comprehensive map of Fediverse Communities</li>
+    <li>Become an Community Ambassador, and help other people migrate as well</li>
+    <li>Be free to use any app you want, without ads or annoying interruptions</li>
+  </ul>
+
+  <form action="{% url 'fediverser-core:redditor-accept-invite' key=invite.key %}" method="POST">
+    {% csrf_token %}
+    <input type="submit" value="Join {{ site.Portal.name }}!" class="button" />
+  </form>
+</section>
+{% endblock %}
