@@ -19,6 +19,7 @@ from . import tasks
 from .models.accounts import UserAccount
 from .models.activitypub import Instance, Person
 from .models.feeds import Entry, Feed
+from .models.invites import RedditorInvite
 from .models.mapping import (
     RecommendCommunity,
     RedditToCommunityRecommendation,
@@ -251,3 +252,10 @@ def on_migrated_reddit_account_publish_entry(sender, **kw):
     ConnectedRedditAccountEntry.objects.create(
         published_by=our_instance, reddit_account=reddit_account, actor=actor
     )
+
+
+@receiver(post_save, sender=RedditorInvite)
+def on_redditor_invite_created_send_message(sender, **kw):
+    if kw["created"]:
+        invite = kw["instance"]
+        tasks.send_invite_to_redditor.delay(invite.id)

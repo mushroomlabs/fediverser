@@ -11,7 +11,6 @@ from invitations.adapters import get_invitations_adapter
 from invitations.app_settings import app_settings as invitations_settings
 from invitations.views import AcceptInvite
 
-from .. import tasks
 from ..forms import RedditorDeclinedInviteForm
 from ..models.accounts import CommunityAmbassadorApplication
 from ..models.activitypub import Community
@@ -126,8 +125,7 @@ class RedditorInviteView(CreateView):
     def post(self, request, *args, **kw):
         redditor = get_object_or_404(RedditAccount, **self.kwargs)
 
-        invite = RedditorInvite.create(redditor=redditor, inviter=self.request.user)
-        tasks.send_invite_to_redditor.delay(invite.id)
+        RedditorInvite.create(redditor=redditor, inviter=self.request.user)
         return HttpResponseRedirect(self.get_success_url())
 
 
