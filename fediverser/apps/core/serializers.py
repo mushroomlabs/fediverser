@@ -132,8 +132,8 @@ class ChangeFeedEntrySerializer(serializers.HyperlinkedModelSerializer):
 
 
 class ConnectedRedditAccountEntrySerializer(ChangeFeedEntrySerializer):
-    reddit_account = serializers.CharField(source="connection.reddit_account.username")
-    actor = serializers.CharField(source="connection.actor.url")
+    reddit_account = serializers.CharField(source="reddit_account.username")
+    actor = serializers.CharField(source="actor.url")
 
     class Meta:
         model = ConnectedRedditAccountEntry

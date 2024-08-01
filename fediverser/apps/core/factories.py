@@ -6,9 +6,10 @@ import factory.fuzzy
 from django.db.models import signals
 from django.template.defaultfilters import slugify
 
-from .models.activitypub import Community, Instance
+from .models.activitypub import Community, Instance, Person
 from .models.mapping import RedditToCommunityRecommendation
 from .models.mirroring import RedditMirrorStrategy
+from .models.network import ConnectedRedditAccount, ConnectedRedditAccountEntry, FediversedInstance
 from .models.reddit import RedditAccount, RedditCommunity, RedditSubmission
 
 BASE36_ALPHABET = string.digits + string.ascii_lowercase
@@ -54,7 +55,7 @@ class RedditMirrorStrategyFactory(factory.django.DjangoModelFactory):
 
 @factory.django.mute_signals(signals.post_save)
 class RedditAccountFactory(factory.django.DjangoModelFactory):
-    username = factory.Sequence(lambda n: "reddit-user-{n:04}")
+    username = factory.Sequence(lambda n: f"reddit-user-{n:04}")
 
     class Meta:
         model = RedditAccount
@@ -65,7 +66,7 @@ class RedditSubmissionFactory(factory.django.DjangoModelFactory):
     subreddit = factory.SubFactory(RedditCommunityFactory)
     author = factory.SubFactory(RedditAccountFactory)
     title = factory.fuzzy.FuzzyText(length=40)
-    url = factory.Sequence(lambda n: "https://test-{n:03}.example.com")
+    url = factory.Sequence(lambda n: f"https://test-{n:03}.example.com")
 
     class Meta:
         model = RedditSubmission
@@ -80,3 +81,36 @@ class SelfPostFactory(RedditSubmissionFactory):
 
     class Meta:
         model = RedditSubmission
+
+
+class FediversedInstanceFactory(factory.django.DjangoModelFactory):
+    portal_url = factory.Sequence(lambda n: f"https://portal-{n:03d}.fediverser.example.com")
+
+    class Meta:
+        model = FediversedInstance
+
+
+class ActorFactory(factory.django.DjangoModelFactory):
+    instance = factory.SubFactory(InstanceFactory)
+    name = factory.Sequence(lambda n: f"actor-{n:03}")
+    url = factory.LazyAttribute(lambda obj: f"https://{obj.instance.domain}/u/{obj.name}")
+
+    class Meta:
+        model = Person
+
+
+class ConnectedRedditAccountFactory(factory.django.DjangoModelFactory):
+    reddit_account = factory.SubFactory(RedditAccountFactory)
+    actor = factory.SubFactory(ActorFactory)
+
+    class Meta:
+        model = ConnectedRedditAccount
+
+
+class ConnectedRedditAccountEntryFactory(factory.django.DjangoModelFactory):
+    reddit_account = factory.SubFactory(RedditAccountFactory)
+    actor = factory.SubFactory(ActorFactory)
+    published_by = factory.SubFactory(FediversedInstanceFactory)
+
+    class Meta:
+        model = ConnectedRedditAccountEntry

@@ -31,4 +31,4 @@ class SignupViewTestCase(BaseTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-__all__ = ("CommunityViewTestCase",)
+__all__ = ("CommunityViewTestCase", "SignupViewTestCase")

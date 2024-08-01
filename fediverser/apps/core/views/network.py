@@ -35,9 +35,11 @@ class ChangeFeedEntryListView(generics.ListAPIView):
     filterset_class = ChangeFeedFilter
 
     def get_queryset(self):
-        return ChangeFeedEntry.objects.filter(
-            published_by__portal_url=app_settings.Portal.url
-        ).select_subclasses()
+        return (
+            ChangeFeedEntry.objects.filter(published_by__portal_url=app_settings.Portal.url)
+            .order_by("-created")
+            .select_subclasses()
+        )
 
 
 class ChangeFeedEntryDetailView(generics.RetrieveAPIView):
