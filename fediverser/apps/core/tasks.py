@@ -56,6 +56,7 @@ def subscribe_to_community(lemmy_local_user_id, community_id):
         logger.warning("Could not find lemmy user")
 
 
+@shared_task
 def send_invite_to_redditor(invite_id):
     try:
         invite = RedditorInvite.objects.get(id=invite_id)
