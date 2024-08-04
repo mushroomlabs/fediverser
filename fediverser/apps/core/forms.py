@@ -7,6 +7,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django_countries.fields import CountryField
+from tree_queries.forms import TreeNodeChoiceField
 
 from . import models
 from .models.activitypub import AP_SERVER_SOFTWARE
@@ -32,7 +33,7 @@ class ContentFeedField(forms.Field):
 
 
 class CategoryPickerForm(forms.Form):
-    category = forms.ModelChoiceField(queryset=models.Category.objects.all())
+    category = TreeNodeChoiceField(queryset=models.Category.objects.all())
 
 
 class SubredditCreateForm(forms.ModelForm):
