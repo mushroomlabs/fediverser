@@ -89,7 +89,7 @@ class CommunityFilter(filters.FilterSet):
 
 
 class RedditCommunityFilter(filters.FilterSet):
-    search = filters.CharFilter(label="search", field_name="name", lookup_expr="icontains")
+    name = filters.CharFilter(lookup_expr="icontains")
     mapped = filters.BooleanFilter(label="mapped", method="with_recommendations")
     subscribed = filters.BooleanFilter(label="subscribed", method="with_reddit_subscriptions")
     locked = filters.BooleanFilter(label="locked", field_name="annotation__locked")
@@ -106,8 +106,6 @@ class RedditCommunityFilter(filters.FilterSet):
     @property
     def qs(self):
         queryset = super().qs
-        if "subscribed" not in self.data and self.request.user.is_authenticated:
-            queryset = queryset.filter(useraccount__user=self.request.user)
         if "over18" not in self.data:
             queryset = queryset.exclude(over18=True)
         return queryset
