@@ -82,10 +82,18 @@ class CommunityFilter(filters.FilterSet):
     )
     name = filters.CharFilter(lookup_expr="icontains")
     locked = filters.BooleanFilter(label="locked", field_name="annotation__locked")
+    over18 = filters.BooleanFilter(label="Adult", field_name="instance__over18")
+
+    @property
+    def qs(self):
+        queryset = super().qs
+        if "over18" not in self.data:
+            queryset = queryset.exclude(instance__over18=True)
+        return queryset
 
     class Meta:
         model = models.Community
-        fields = ("name", "instance", "locked")
+        fields = ("name", "instance", "over18", "locked")
 
 
 class RedditCommunityFilter(filters.FilterSet):
