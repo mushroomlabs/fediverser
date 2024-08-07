@@ -66,6 +66,11 @@ urlpatterns = [
         views.CommunityFeedCreateView.as_view(),
         name="community-contentfeed-create",
     ),
+    path(
+        "reddit/submissions/<str:submission_id>",
+        views.RedditSubmissionView.as_view(),
+        name="redditsubmission-detail",
+    ),
     path("subreddits", views.SubredditListView.as_view(), name="subreddit-list"),
     path("subreddits/create", views.SubredditCreateView.as_view(), name="subreddit-create"),
     path("subreddits/<str:name>", views.SubredditDetailView.as_view(), name="subreddit-detail"),

@@ -88,7 +88,7 @@
     <tbody>
     {% for submission in submissions %}
       <tr>
-        <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
+        <td><a href="{% url 'fediverser-core:redditsubmission-detail' submission_id=submission.id %}">{{ submission.title }}</a></td>
         <td><a href="{% url 'fediverser-core:subreddit-detail' submission.subreddit.name %}">{{ submission.subreddit }}</a></td>
         <td>
           <a href="{% url 'fediverser-core:redditor-detail' username=submission.author.username %}">

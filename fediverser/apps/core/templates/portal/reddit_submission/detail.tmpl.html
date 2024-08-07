@@ -1,0 +1,24 @@
+{% extends "portal/base.tmpl.html" %}
+{% load humanize fediverser %}
+
+
+{% block main_header %}
+{% with object.title|truncatewords:6 as title %}
+{% include "portal/redditor/header.tmpl.html" with title=title subtitle=page_subtitle action_url=None action_text=None redditor=object.author %}
+{% endwith %}
+{% endblock %}
+
+{% block main_content %}
+<dl>
+  <dt>Reddit Submission</dt>
+  <dd><a href="{{ object.url }}"}} target="_blank">{{ object.title }}</a></dd>
+  <dt>Subreddit</dt>
+  <dd>{{ object.subreddit }}</dd>
+  <dt>Author</dt>
+  <dd>{{ object.author }}</dd>
+  <dt>Posted</dt>
+  <dd>{{ object.created|naturaltime }}
+</dl>
+
+<hr />
+{% endblock %}

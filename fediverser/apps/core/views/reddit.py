@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 
 from .. import models
-from .common import DetailView, ListView, build_breadcrumbs
+from .common import DetailView, ListView
 
 
 class RedditorListView(ListView):
@@ -22,7 +22,6 @@ class RedditorDetailView(DetailView):
 
         context.update(
             {
-                "breadcrumbs_items": build_breadcrumbs(),
                 "page_title": redditor.username,
             }
         )
@@ -32,4 +31,18 @@ class RedditorDetailView(DetailView):
         return get_object_or_404(self.model, username=self.kwargs["username"])
 
 
-__all__ = ("RedditorListView", "RedditorDetailView")
+class RedditSubmissionView(DetailView):
+    model = models.RedditSubmission
+    template_name = "portal/reddit_submission/detail.tmpl.html"
+    header_icon = "post"
+
+    @property
+    def page_title(self):
+        submission = self.get_object()
+        return submission.title
+
+    def get_object(self):
+        return get_object_or_404(self.model, id=self.kwargs["submission_id"])
+
+
+__all__ = ("RedditorListView", "RedditorDetailView", "RedditSubmissionView")
