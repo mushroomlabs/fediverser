@@ -67,9 +67,11 @@ services:
       POSTGRES_DB: fediverser
 
   broker:
+    <<: *fediverser-development
     restart: unless-stopped
 
   cache:
+    <<: *fediverser-development
     restart: unless-stopped
 
   admin:
