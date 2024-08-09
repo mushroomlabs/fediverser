@@ -156,15 +156,19 @@ class FediversedInstance(models.Model):
                 entries = response.json()
                 for entry in entries:
                     try:
-                        ChangeFeedEntry.make(instance=self, entry=entry)
-                    except Exception:
-                        logger.exception("Failed to parse feed entry", extra={"entry": entry})
+                        feed_entry = ChangeFeedEntry.make(instance=self, entry=entry)
+                        logger.debug(f"Created {feed_entry}")
+                    except Exception as exc:
+                        logger.warning(
+                            f"Failed to parse feed entry: {exc}", extra={"entry": entry}
+                        )
                 try:
                     url = [
-                        st.split(";")[0].removeprefix("<").removesuffix(">")
+                        st.strip().split(";")[0].removeprefix("<").removesuffix(">")
                         for st in response.headers["link"].split(",")
                         if 'rel="next"' in st
                     ].pop()
+                    logger.debug(f"Will continue pull from {url}")
                 except (IndexError, KeyError):
                     keep_going = False
             except Exception:
@@ -312,12 +316,23 @@ class RedditToCommunityRecommendationEntry(ChangeFeedEntry):
 
         subreddit = RedditCommunity.objects.filter(
             name__iexact=subreddit_name
-        ) or RedditCommunity.fetch(subreddit_name)
+        ).first() or RedditCommunity.fetch(subreddit_name)
 
-        community = Community.objects.filter(url=actor_url).first() or Community.fetch(actor_url)
+        community = Community.objects.filter(url=actor_url).first()
+
+        if not community:
+            domain = urlparse(actor_url).hostname
+            if Instance.objects.filter(
+                domain=domain,
+                annotation__status__in=[INSTANCE_STATUSES.closed, INSTANCE_STATUSES.abandoned],
+            ).exists():
+                raise ValueError(f"{actor_url} is from an inactive instance")
+
+            community = Community.fetch(actor_url)
         entry, _ = cls.objects.get_or_create(
             published_by=instance, subreddit=subreddit, community=community
         )
+
         return entry
 
 

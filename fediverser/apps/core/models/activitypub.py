@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from django.db import models
 from pythorhead.types import LanguageType
+from requests.exceptions import ConnectionError
 
 from fediverser.apps.lemmy.models import Community as LemmyCommunity, Language
 from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
@@ -58,15 +59,19 @@ class Instance(models.Model):
     @classmethod
     def fetch(cls, url):
         domain = urlparse(url).hostname
-        software_info = cls.get_software_info(url)
 
-        instance, _ = cls.objects.update_or_create(
-            domain=domain,
-            defaults={
-                "software": software_info["software"]["name"],
-                "open_registrations": software_info.get("openRegistrations") or False,
-            },
-        )
+        try:
+            software_info = cls.get_software_info(url)
+            instance, _ = cls.objects.update_or_create(
+                domain=domain,
+                defaults={
+                    "software": software_info["software"]["name"],
+                    "open_registrations": software_info.get("openRegistrations") or False,
+                },
+            )
+        except ConnectionError:
+            instance, _ = cls.objects.get_or_create(domain=domain)
+
         return instance
 
     def __str__(self):

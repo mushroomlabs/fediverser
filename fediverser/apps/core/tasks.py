@@ -4,14 +4,14 @@ import random
 
 from celery import shared_task
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from fediverser.apps.lemmy.services import InstanceProxy, LemmyClientRateLimited, LocalUserProxy
 
-from .choices import AutomaticSubmissionPolicies
+from .choices import AutomaticCommentPolicies, AutomaticSubmissionPolicies
 from .models.activitypub import Community, Instance, make_ap_client
 from .models.common import AP_SERVER_SOFTWARE
 from .models.feeds import Entry, Feed
@@ -156,6 +156,47 @@ def mirror_comment_to_lemmy(comment_id):
 
 
 @shared_task
+def push_new_comments_to_lemmy():
+    allows_mirroring = Q(
+        mirroring_strategies__automatic_comment_policy__in=[
+            AutomaticCommentPolicies.FULL,
+            AutomaticCommentPolicies.SELF_POST_ONLY,
+            AutomaticCommentPolicies.LINK_ONLY,
+        ]
+    )
+
+    mapped = Q(mirroring_strategies__isnull=False)
+
+    for subreddit in RedditCommunity.objects.filter(mapped & allows_mirroring):
+        logger.info(f"Checking comments for {subreddit}")
+        mirrored_comments = LemmyMirroredComment.objects.filter(
+            lemmy_mirrored_post__reddit_submission__subreddit=subreddit
+        )
+
+        most_recent = mirrored_comments.aggregate(most_recent=Max("created")).get("most_recent")
+        threshold = most_recent or timezone.now() - datetime.timedelta(minutes=10)
+
+        logger.info(f"Finding all comments created after {threshold}")
+        candidates = RedditComment.objects.filter(
+            created__gte=threshold,
+            submission__subreddit=subreddit,
+            status=RedditComment.STATUS.retrieved,
+        )
+
+        with_mirrored_submissions = Q(submission__lemmy_mirrored_posts__isnull=False)
+        no_pending_parent = Q(parent=None) | Q(parent__status=RedditComment.STATUS.mirrored)
+
+        comments = candidates.filter(with_mirrored_submissions).filter(no_pending_parent)
+
+        for comment in comments.distinct().iterator():
+            comment.status = RedditComment.STATUS.accepted
+            comment.save()
+
+            logger.info(f"Scheduling mirror of comment {comment.id}")
+            mirror_comment_to_lemmy(comment.id)
+
+
+@shared_task
 def push_new_submissions_to_lemmy():
     NOW = timezone.now()
 
@@ -179,7 +220,7 @@ def push_new_submissions_to_lemmy():
         is_retrieved & allows_automatic_mirroring
     ).exclude(unmapped | from_spammer | from_bot | old_post | already_posted)
 
-    for reddit_submission in submissions.distinct():
+    for reddit_submission in submissions.distinct().order_by("?"):
         logger.info(f"Checking submission {reddit_submission.url}")
 
         if not reddit_submission.can_be_submitted_automatically:
@@ -187,35 +228,31 @@ def push_new_submissions_to_lemmy():
             reddit_submission.save()
             continue
 
-        communities = [
-            community
-            for community in Community.objects.filter(
-                mirroring_strategies__subreddit=reddit_submission.subreddit,
-                mirroring_strategies__automatic_submission_policy__in=[
-                    AutomaticSubmissionPolicies.FULL,
-                    AutomaticSubmissionPolicies.SELF_POST_ONLY,
-                    AutomaticSubmissionPolicies.LINK_ONLY,
-                ],
-            )
-        ]
+        community = Community.objects.filter(
+            mirroring_strategies__subreddit=reddit_submission.subreddit,
+            mirroring_strategies__automatic_submission_policy__in=[
+                AutomaticSubmissionPolicies.FULL,
+                AutomaticSubmissionPolicies.SELF_POST_ONLY,
+                AutomaticSubmissionPolicies.LINK_ONLY,
+            ],
+        ).first()
 
-        if len(communities) == 0:
+        if community is None:
             reddit_submission.status = RedditSubmission.STATUS.rejected
             reddit_submission.save()
             continue
 
-        for community in communities:
-            try:
-                LemmyMirroredPost.make_mirror(
-                    reddit_submission=reddit_submission, community=community
-                )
-                logger.info(f"Posted {reddit_submission.id} to {community.name}")
-            except RejectedPost as exc:
-                logger.warning(f"Post was rejected: {exc}")
-                reddit_submission.status = RedditSubmission.STATUS.rejected
-                reddit_submission.save()
-            except Exception:
-                logger.exception(f"Failed to post {reddit_submission.id}")
+        try:
+            LemmyMirroredPost.make_mirror(reddit_submission=reddit_submission, community=community)
+            logger.info(f"Posted {reddit_submission.id} to {community.name}")
+        except RejectedPost as exc:
+            logger.warning(f"Post was rejected: {exc}")
+            reddit_submission.status = RedditSubmission.STATUS.rejected
+            reddit_submission.save()
+        except Exception:
+            logger.exception(f"Failed to post {reddit_submission.id}")
+            reddit_submission.status = RedditSubmission.STATUS.failed
+            reddit_submission.save()
 
 
 @shared_task

@@ -167,7 +167,6 @@ class RedditCommunity(models.Model):
         except UnavailableForLegalReasons:
             self.metadata = None
         except (Forbidden, NotFound):
-            self.hidden = True
             self.metadata = None
         self.save()
 
@@ -194,13 +193,8 @@ class RedditCommunity(models.Model):
                 name=praw_subreddit.display_name,
                 defaults={"description": data.get("description"), "over18": data.get("over18")},
             )
-        except UnavailableForLegalReasons:
-            subreddit, _ = cls.objects.update_or_create(name=name, defaults={"metadata": None})
-
-        except (Forbidden, NotFound):
-            subreddit, _ = cls.objects.update_or_create(
-                name=name, defaults={"hidden": True, "metadata": {}}
-            )
+        except (UnavailableForLegalReasons, Forbidden, NotFound):
+            subreddit, _ = cls.objects.update_or_create(name=name, defaults={"metadata": {}})
         return subreddit
 
     class Meta:

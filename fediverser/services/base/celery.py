@@ -24,6 +24,14 @@ class FediverserCeleryConfig(object):
             "task": "fediverser.apps.core.tasks.sync_change_feeds",
             "schedule": crontab(),
         },
+        "push_lemmy_submissions": {
+            "task": "fediverser.apps.core.tasks.push_new_submissions_to_lemmy",
+            "schedule": crontab(),
+        },
+        "push_lemmy_comments": {
+            "task": "fediverser.apps.core.tasks.push_new_comments_to_lemmy",
+            "schedule": crontab(),
+        },
     }
 
     task_always_eager = settings.TEST_MODE

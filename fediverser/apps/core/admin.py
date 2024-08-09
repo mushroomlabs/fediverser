@@ -43,6 +43,42 @@ class ReadOnlyMixin:
         return False
 
 
+class MirroredCommunityFilter(admin.SimpleListFilter):
+    title = "Target Community"
+
+    parameter_name = "target"
+
+    def lookups(self, request, model_admin):
+        communities = Community.objects.filter(mirroring_strategies__isnull=False)
+        return [(c.id, c.fqdn) for c in communities.select_related("instance")]
+
+    def queryset(self, request, queryset):
+        selection = self.value()
+
+        if selection is None:
+            return queryset
+
+        return queryset.filter(community_id=selection)
+
+
+class MirroringSubredditFilter(admin.SimpleListFilter):
+    title = "Source Subreddit"
+
+    parameter_name = "source"
+
+    def lookups(self, request, model_admin):
+        subreddits = RedditCommunity.objects.filter(mirroring_strategies__isnull=False)
+        return [(s.id, str(s)) for s in subreddits]
+
+    def queryset(self, request, queryset):
+        selection = self.value()
+
+        if selection is None:
+            return queryset
+
+        return queryset.filter(reddit_submission__subreddit_id=selection)
+
+
 @admin.register(UserAccount)
 class UserAccountAdmin(admin.ModelAdmin):
     list_display = ("username", "lemmy_local_username")
@@ -535,16 +571,19 @@ class RedditSubmissionAdmin(ReadOnlyMixin, admin.ModelAdmin):
 @admin.register(RedditComment)
 class RedditCommentAdmin(ReadOnlyMixin, admin.ModelAdmin):
     date_hierarchy = "created"
-    list_display = ("submission_id", "author", "body", "is_spam")
+    list_display = ("submission_id", "subreddit", "author", "body", "created", "is_spam")
     list_filter = ("distinguished", "marked_as_spam", "status")
+    list_select_related = ("submission", "submission__subreddit")
     actions = ("mark_as_spam", "mark_as_ham")
-    search_fields = ("id", "body")
+    search_fields = ("id", "body", "submission__subreddit__name")
 
+    @admin.display(description="Subreddit")
+    def subreddit(self, obj):
+        return obj.submission.subreddit
+
+    @admin.display(boolean=True, description="Spam")
     def is_spam(self, obj):
         return obj.marked_as_spam
-
-    is_spam.short_description = "Spam"
-    is_spam.boolean = True
 
     @admin.action(description="Flag as Spam")
     def mark_as_spam(self, request, queryset):
@@ -582,9 +621,17 @@ class LemmyMirroredCommentAdmin(admin.ModelAdmin):
 
 @admin.register(LemmyMirroredPost)
 class LemmyMirroredPostAdmin(admin.ModelAdmin):
-    list_display = ("reddit_submission", "community")
-    list_select_related = ("reddit_submission", "community")
-    list_filter = ("community",)
+    list_display = ("title", "subreddit", "community")
+    list_select_related = ("reddit_submission", "reddit_submission__subreddit", "community")
+    list_filter = (MirroringSubredditFilter, MirroredCommunityFilter)
+
+    @admin.display(description="Post Title")
+    def title(self, obj):
+        return obj.reddit_submission.title[:60]
+
+    @admin.display(description="Subreddit")
+    def subreddit(self, obj):
+        return str(obj.reddit_submission.subreddit)
 
     def has_change_permission(self, request, obj=None):
         return False

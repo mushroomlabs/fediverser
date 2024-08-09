@@ -94,14 +94,12 @@ services:
     <<: *fediverser-dev-service
     command: poetry run django-admin pull_from_reddit
 
-  push_comments_to_lemmy:
-    <<: *fediverser-dev-service
-
-  push_submissions_to_lemmy:
-    <<: *fediverser-dev-service
-
   celery:
     <<: *fediverser-dev-service
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 20000
 
   celerybeat:
     <<: *fediverser-dev-service

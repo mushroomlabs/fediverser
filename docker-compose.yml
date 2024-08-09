@@ -65,14 +65,6 @@ services:
     <<: *fediverser-service
     command: poetry run django-admin pull_from_reddit
 
-  push_comments_to_lemmy:
-    <<: *fediverser-service
-    command: poetry run django-admin push_comments_to_lemmy
-
-  push_submissions_to_lemmy:
-    <<: *fediverser-service
-    command: poetry run django-admin push_submissions_to_lemmy
-
   celery:
     <<: *fediverser-service
     command: poetry run celery -A fediverser.services.base worker -l INFO -E
