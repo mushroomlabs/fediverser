@@ -81,6 +81,7 @@ def on_reddit_user_login_setup_accounts(sender, **kw):
 
         if homonym is not None and not homonym.is_bot:
             logger.info("Not creating account on Lemmy because username is taken")
+            return
 
         lemmy_instance = InstanceProxy.get_connected_instance()
 
@@ -99,6 +100,22 @@ def on_reddit_user_login_setup_accounts(sender, **kw):
         redditor_migrated.send_robust(
             sender=RedditAccount, reddit_username=reddit_username, activitypub_actor=person
         )
+
+
+@receiver(post_save, sender=SocialAccount)
+def on_reddit_user_login_get_tracked_subreddits(sender, **kw):
+    social_account = kw["instance"]
+
+    reddit_username = social_account.extra_data["name"]
+    reddit_account = RedditAccount.objects.filter(username=reddit_username).first()
+    if reddit_account is None:
+        logger.warning(f"Could not find account for {reddit_username}")
+        return
+
+    if kw["created"] and social_account.provider == RedditProvider.id:
+        user_account, _ = UserAccount.objects.get_or_create(user=social_account.user)
+        for subreddit in reddit_account.subreddits.all():
+            user_account.tracked_subreddits.add(subreddit)
 
 
 @receiver(pre_social_login)
