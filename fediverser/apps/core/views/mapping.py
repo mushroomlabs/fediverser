@@ -138,7 +138,7 @@ class SubredditAlternativeRecommendationCreateView(CreateView):
         context.update(
             {
                 "subreddit": subreddit,
-                "page_title": "Recommend Subreddit",
+                "page_title": "Recommend Community",
                 "page_subtitle": subreddit.name,
             }
         )
