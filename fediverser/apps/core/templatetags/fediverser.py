@@ -218,6 +218,9 @@ def has_pending_ambassador_application(user, community):
 
 @register.filter
 def lemmy_create_post_url(user):
+    if not user.is_authenticated:
+        return None
+
     lemmy_client = user.account.lemmy_client
     return lemmy_client and f"{lemmy_client._requestor.domain}/create_post"
 
