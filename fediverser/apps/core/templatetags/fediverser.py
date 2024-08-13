@@ -217,6 +217,12 @@ def has_pending_ambassador_application(user, community):
 
 
 @register.filter
+def lemmy_create_post_url(user):
+    lemmy_client = user.account.lemmy_client
+    return lemmy_client and f"{lemmy_client._requestor.domain}/create_post"
+
+
+@register.filter
 def homepage_submissions(user):
     if user.is_authenticated:
         subreddits = user.account.tracked_subreddits.all()

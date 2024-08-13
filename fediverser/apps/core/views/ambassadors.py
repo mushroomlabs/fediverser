@@ -171,7 +171,7 @@ class CommunityRepostRedditSubmissionView(LoginRequiredMixin, RedirectView):
             post_payload = {"url": original_url}
 
         query_string = LemmyMirroredPost.lemmy_post_payload_to_query_string(post_payload)
-        create_post_url = f"https://{lemmy_client._requestor.domain}/create_post"
+        create_post_url = f"{lemmy_client._requestor.domain}/create_post"
         return f"{create_post_url}?{query_string}"
 
 

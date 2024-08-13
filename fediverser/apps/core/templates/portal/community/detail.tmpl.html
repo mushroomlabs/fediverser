@@ -87,6 +87,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
 
 <hr />
 
+{% with user|lemmy_create_post_url as lemmy_post_url %}
 {% with object|latest_feed_entries as feed_entries %}
 {% with object|submissions_from_related_subreddits as reddit_submissions %}
 {% if feed_entries.exists or reddit_submissions.exists %}
@@ -104,11 +105,11 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
   <tbody>
     {% for submission in reddit_submissions %}
     <tr>
-      <td><a href="{{ submission.url }}" target="_blank">{{ submission.title }}</a></td>
-      <td>{{ submission.subreddit.name }}</td>
+      <td><a href="{% url 'fediverser-core:redditsubmission-detail' submission_id=submission.id %}">{{ submission.title }}</a></td>
+      <td>{{ submission.author }} on {{ submission.subreddit.name }}</td>
       <td>{{ submission.created|naturaltime }}</td>
       <td>
-        {% if submission.can_be_submitted_automatically %}
+        {% if submission.can_be_submitted_automatically and not submission.is_self_post %}
         <a class="button text-replace button--icon"
             role="link"
             href="{% url 'fediverser-core:community-repost-reddit' name=object.name instance_domain=object.instance.domain %}?url={{ submission.url|urlencode}}">
@@ -124,7 +125,16 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
       <td><a href="{{ entry.link }}" target="_blank">{{ entry.title }}</a></td>
       <td>{{ entry.feed.link }}</td>
       <td>{{ entry.modified|naturaltime }}</td>
-      <td></td>
+      <td>
+        {% if lemmy_post_url is not None %}
+        <a class="button text-replace button--icon"
+            role="link"
+            href="{{ lemmy_post_url }}?url={{ entry.link|urlencode}}">
+          {% icon name="upload" %}
+          Post
+        </a>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </tbody>
@@ -132,6 +142,7 @@ You are enrolled as an ambassador for {{ object.fqdn }}.
 {% else %}
 <p>The Community Ambassadors for {{ object.fqdn }} have not defined any RSS feed that might be relevant</p>
 {% endif %}
+{% endwith %}
 {% endwith %}
 {% endwith %}
 
