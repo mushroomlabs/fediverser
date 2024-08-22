@@ -88,7 +88,11 @@ class SubredditDetailView(DetailView):
 
         subreddit = context["object"]
 
-        is_subscriber = subreddit in self.request.user.account.tracked_subreddits.all()
+        try:
+            is_subscriber = subreddit in self.request.user.account.tracked_subreddits.all()
+        except AttributeError:
+            is_subscriber = False
+
         header_action_label = "Unsubscribe" if is_subscriber else "Subscribe"
         header_action_view_name = (
             "subreddit-unsubscribe" if is_subscriber else "subreddit-subscribe"
