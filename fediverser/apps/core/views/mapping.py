@@ -16,7 +16,7 @@ from ..filters import (
     InstanceRecommendationFilter,
     RedditCommunityFilter,
 )
-from .common import CreateView, DetailView, ListView, build_breadcrumbs
+from .common import CreateView, DetailView, ListView, PostActionView, build_breadcrumbs
 
 
 class SubredditCreateView(CreateView):
@@ -294,6 +294,47 @@ class InstanceCategoryRecommendationCreateView(CreateView):
         return super().form_valid(form)
 
 
+class InstanceClosedAnnotationCreateView(PostActionView):
+    model = models.SetInstanceAsClosed
+    fields = ()
+    page_subtitle = "Mark as Closed"
+    view_name = "fediverser-core:instance-closedannotation-create"
+
+    @property
+    def page_title(self):
+        return self.kwargs["domain"]
+
+    def get_queryset(self, *args, **kw):
+        return models.Instance.objects.filter(domain=self.kwargs["domain"])
+
+    def get_success_url(self, *args, **kw):
+        return reverse("fediverser-core:activity-list")
+
+    def process(self):
+        instance = get_object_or_404(models.Instance, domain=self.kwargs["domain"])
+        models.SetInstanceAsClosed.objects.create(requester=self.request.user, instance=instance)
+
+
+class InstanceAbandonedAnnotationCreateView(PostActionView):
+    model = models.SetInstanceAsAbandoned
+    fields = ()
+    page_subtitle = "Mark as Abandoned"
+    view_name = "fediverser-core:instance-abandonedannotation-create"
+
+    @property
+    def page_title(self):
+        return self.kwargs["domain"]
+
+    def get_success_url(self, *args, **kw):
+        return reverse("fediverser-core:activity-list")
+
+    def process(self):
+        instance = get_object_or_404(models.Instance, domain=self.kwargs["domain"])
+        models.SetInstanceAsAbandoned.objects.create(
+            requester=self.request.user, instance=instance
+        )
+
+
 class CommunityListView(ListView):
     model = models.Community
     template_name = "portal/community/list.tmpl.html"
@@ -449,6 +490,8 @@ __all__ = (
     "InstanceDetailView",
     "InstanceCountryRecommendationCreateView",
     "InstanceCategoryRecommendationCreateView",
+    "InstanceClosedAnnotationCreateView",
+    "InstanceAbandonedAnnotationCreateView",
     "InstanceRecommendationsListView",
     "CommunityListView",
     "CommunityCategoryRecommendationCreateView",

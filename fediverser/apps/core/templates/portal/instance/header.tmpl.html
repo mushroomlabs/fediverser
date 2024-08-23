@@ -1,0 +1,18 @@
+{% extends "portal/partials/header.tmpl.html" %}
+{% load wagtailadmin_tags fediverser %}
+
+{% block right_column %}
+<div class="actionbutton">
+  {% if instance|is_active_instance %}
+  <form action="{% url 'fediverser-core:instance-abandonedannotation-create' domain=instance.domain %}" method="POST" novalidate>
+    {% csrf_token %}
+    <button class="button bicolor button--icon">{% icon name='warning' wrapped=1 %}Report as Abandoned</button>
+  </form>
+  {% elif instance|is_abandoned_instance %}
+  <form action="{% url 'fediverser-core:instance-closedannotation-create' domain=instance.domain %}" method="POST" novalidate>
+    {% csrf_token %}
+    <button class="button bicolor button--icon">{% icon name='warning' wrapped=1 %}Report as Closed</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

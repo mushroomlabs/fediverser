@@ -2,7 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, transaction
 from django_countries.fields import CountryField
 from model_utils import Choices
 from model_utils.managers import InheritanceManager, QueryManager
@@ -11,6 +11,7 @@ from taggit.managers import TaggableManager
 from wagtail.images.models import Image
 from wagtail.snippets.models import register_snippet
 
+from ..signals import instance_abandoned, instance_closed
 from .activitypub import Community, Instance
 from .common import COMMUNITY_STATUSES, INSTANCE_STATUSES, Category
 from .reddit import RedditCommunity
@@ -240,6 +241,43 @@ class SetInstanceCountry(ChangeRequest):
         InstanceCountry.objects.get_or_create(instance=self.instance, country=self.country)
 
 
+class SetInstanceAsClosed(ChangeRequest):
+    instance = models.ForeignKey(
+        Instance, related_name="instance_closed_annotations", on_delete=models.CASCADE
+    )
+
+    @property
+    def description(self):
+        return f"Set {self.instance} as closed"
+
+    def apply(self):
+        with transaction.atomic():
+            annotation, _ = InstanceAnnotation.objects.get_or_create(instance=self.instance)
+            annotation.status = INSTANCE_STATUSES.closed
+            annotation.save()
+            instance_closed.send(instance=self.instance, sender=Instance)
+
+
+class SetInstanceAsAbandoned(ChangeRequest):
+    instance = models.ForeignKey(
+        Instance, related_name="instance_abandoned_annotations", on_delete=models.CASCADE
+    )
+
+    @property
+    def description(self):
+        return f"Set {self.instance} as abandoned"
+
+    def apply(self):
+        with transaction.atomic():
+            extra, _ = InstanceExtraInformation.objects.get_or_create(instance=self.instance)
+            extra.abandoned = True
+            extra.save()
+            annotation, _ = InstanceAnnotation.objects.get_or_create(instance=self.instance)
+            annotation.status = INSTANCE_STATUSES.abandoned
+            annotation.save()
+            instance_abandoned.send(instance=self.instance, sender=Instance)
+
+
 class CommunityRequest(StatusModel):
     STATUS = Choices("requested", "accepted", "rejected")
     requested_by = models.ForeignKey(
@@ -275,5 +313,7 @@ __all__ = (
     "SetCommunityCategory",
     "SetInstanceCategory",
     "SetInstanceCountry",
+    "SetInstanceAsClosed",
+    "SetInstanceAsAbandoned",
     "CommunityRequest",
 )

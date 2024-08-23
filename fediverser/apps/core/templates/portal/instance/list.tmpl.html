@@ -7,6 +7,7 @@
     <tr>
       <th scope="col">Domain</th>
       <th scope="col">Software</th>
+      <th scope="col">Status</th>
     </tr>
   </thead>
   <tbody>
@@ -21,6 +22,7 @@
         </div>
       </td>
       <td>{{ instance.get_software_display }}</td>
+      <td>{{ instance.annotation.get_status_display|default:"Unknown" }}</td>
     </tr>
     {% endfor %}
   </tbody>

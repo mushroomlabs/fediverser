@@ -3,6 +3,7 @@ from django_countries import countries
 from django_filters import rest_framework as filters
 
 from . import models
+from .models.common import INSTANCE_STATUSES
 
 
 def get_country_list():
@@ -23,7 +24,11 @@ class ChangeRequestFilter(filters.FilterSet):
 class InstanceFilter(filters.FilterSet):
     country = filters.ChoiceFilter(choices=get_country_list, label="Country", method="by_country")
     topic = filters.ChoiceFilter(choices=get_topic_list, label="Interests", method="by_topic")
-    locked = filters.BooleanFilter(label="locked", field_name="annotation__locked")
+    locked = filters.BooleanFilter(label="Locked", field_name="annotation__locked")
+    domain = filters.CharFilter(label="Domain", lookup_expr="icontains")
+    status = filters.ChoiceFilter(
+        choices=INSTANCE_STATUSES, label="Status", field_name="annotation__status"
+    )
 
     def by_country(self, queryset, name, value):
         return queryset.filter(related_countries__country=value)
@@ -33,7 +38,7 @@ class InstanceFilter(filters.FilterSet):
 
     class Meta:
         model = models.Instance
-        fields = ("software", "country", "topic", "locked")
+        fields = ("software", "domain", "country", "topic", "status", "locked")
 
 
 class InstanceRecommendationFilter(filters.FilterSet):

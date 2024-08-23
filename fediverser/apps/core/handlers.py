@@ -24,6 +24,8 @@ from .models.mapping import (
     RecommendCommunity,
     RedditToCommunityRecommendation,
     SetCommunityCategory,
+    SetInstanceAsAbandoned,
+    SetInstanceAsClosed,
     SetInstanceCategory,
     SetInstanceCountry,
     SetRedditCommunityCategory,
@@ -43,7 +45,7 @@ from .models.reddit import (
     make_reddit_user_client,
 )
 from .settings import app_settings
-from .signals import redditor_migrated
+from .signals import instance_abandoned, instance_closed, redditor_migrated
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -251,6 +253,8 @@ def on_instance_created_get_extra_information(sender, **kw):
 @receiver(post_save, sender=SetCommunityCategory)
 @receiver(post_save, sender=SetInstanceCategory)
 @receiver(post_save, sender=SetInstanceCountry)
+@receiver(post_save, sender=SetInstanceAsAbandoned)
+@receiver(post_save, sender=SetInstanceAsClosed)
 def on_change_request_created_check_auto_accepted(sender, **kw):
     instance = kw["instance"]
     if kw["created"] and instance.auto_accept:
@@ -269,6 +273,13 @@ def on_migrated_reddit_account_publish_entry(sender, **kw):
     ConnectedRedditAccountEntry.objects.create(
         published_by=our_instance, reddit_account=reddit_account, actor=actor
     )
+
+
+@receiver(instance_closed)
+@receiver(instance_abandoned)
+def on_instance_retired_remove_community_recommendations(sender, **kw):
+    instance = kw["instance"]
+    RedditToCommunityRecommendation.objects.filter(community__instance=instance).delete()
 
 
 @receiver(post_save, sender=RedditorInvite)

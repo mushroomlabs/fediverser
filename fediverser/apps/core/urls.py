@@ -35,6 +35,16 @@ urlpatterns = [
         views.InstanceCountryRecommendationCreateView.as_view(),
         name="instance-countryrecommendation-create",
     ),
+    path(
+        "instances/<str:domain>/annotate/closed",
+        views.InstanceClosedAnnotationCreateView.as_view(),
+        name="instance-closedannotation-create",
+    ),
+    path(
+        "instances/<str:domain>/annotate/abandoned",
+        views.InstanceAbandonedAnnotationCreateView.as_view(),
+        name="instance-abandonedannotation-create",
+    ),
     path("communities", views.CommunityListView.as_view(), name="community-list"),
     path(
         "communities/create",

@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic.base import TemplateView
 from django.views.generic.detail import DetailView as BaseDetailView
@@ -78,6 +79,15 @@ class CreateView(LoginRequiredMixin, BaseCreateView):
             }
         )
         return context
+
+
+class PostActionView(CreateView):
+    def process(self):
+        return
+
+    def post(self, request, *args, **kw):
+        self.process()
+        return redirect(self.get_success_url())
 
 
 class ListView(BaseListView):
