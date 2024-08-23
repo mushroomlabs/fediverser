@@ -83,7 +83,7 @@ class CommunityCreateForm(forms.ModelForm):
             assert self._find_by_url(url) is None, f"{url} is already in the database"
             assert (
                 server_type in AP_SERVER_SOFTWARE
-            ), "We do not support {server_type} servers, yet."
+            ), f"We do not support {server_type} servers, yet."
 
             assert self.community_data is not None, "could not get community details"
         except KeyError as exc:

@@ -304,6 +304,7 @@ class CommunityListView(ListView):
     header_icon = "group"
     header_action_label = "Add new community"
     header_action_url = reverse_lazy("fediverser-core:community-create")
+    ordering = ("instance__domain", "name")
 
 
 class CommunityCategoryRecommendationCreateView(CreateView):

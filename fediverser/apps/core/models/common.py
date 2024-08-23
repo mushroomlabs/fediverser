@@ -27,6 +27,7 @@ AP_SERVER_SOFTWARE = Choices(
     ("kbin", "Kbin"),
     ("mbin", "Mbin"),
     ("mastodon", "Mastodon"),
+    ("PieFed", "PieFed"),
 )
 
 
