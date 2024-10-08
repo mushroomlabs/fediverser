@@ -145,5 +145,6 @@ urlpatterns = [
         views.ChangeFeedEntryDetailView.as_view(),
         name="changefeedentry-detail",
     ),
+    path("api/auth/reddit", views.RedditAPILoginView.as_view(), name="reddit_login"),
     path("feed/changes", views.ChangeFeed(), name="changefeed-feed"),
 ]

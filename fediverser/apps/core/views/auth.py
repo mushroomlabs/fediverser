@@ -2,6 +2,7 @@ from allauth.socialaccount.providers.base.constants import AuthProcess
 from allauth.socialaccount.providers.oauth2.views import OAuth2LoginView
 from allauth.socialaccount.providers.reddit.provider import RedditProvider
 from allauth.socialaccount.providers.reddit.views import RedditAdapter
+from dj_rest_auth.registration.views import SocialLoginView
 from django.urls import reverse
 from django.views.generic.base import RedirectView
 
@@ -59,4 +60,8 @@ class RedditConnectionView(OAuth2LoginView, RedirectView):
         return response.url
 
 
-__all__ = ("RedditLoginView", "RedditConnectionView")
+class RedditAPILoginView(SocialLoginView):
+    adapter_class = RedditAdapter
+
+
+__all__ = ("RedditLoginView", "RedditConnectionView", "RedditAPILoginView")

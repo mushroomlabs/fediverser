@@ -8,6 +8,7 @@ from wagtailautocomplete.urls.admin import urlpatterns as autocomplete_admin_url
 
 urlpatterns = [
     path("_ui/", include(wagtailadmin_urls)),  # We are using UI components from wagtail
+    path("api/auth/", include("dj_rest_auth.urls")),
     path("accounts/", include("allauth.urls")),
     path("invitations/", include("invitations.urls", namespace="invitations")),
     path("autocomplete/", include(autocomplete_admin_urls)),

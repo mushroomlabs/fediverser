@@ -33,6 +33,7 @@ DJANGO_APPS = (
 )
 
 THIRD_PARTY_APPS = (
+    "corsheaders",
     "django_celery_beat",
     "django_celery_results",
     "django_countries",
@@ -45,6 +46,8 @@ THIRD_PARTY_APPS = (
     "allauth.socialaccount.providers.reddit",
     "invitations",
     "rest_framework",
+    "rest_framework.authtoken",
+    "dj_rest_auth",
     "modelcluster",
     "taggit",
     "tree_queries",
@@ -71,6 +74,7 @@ INSTALLED_APPS = INTERNAL_APPS + THIRD_PARTY_APPS + DJANGO_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
