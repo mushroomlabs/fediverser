@@ -76,11 +76,14 @@ class CommunitySerializer(serializers.ModelSerializer):
 class RedditCommunitySerializer(serializers.ModelSerializer):
     recommended_communities = CommunitySerializer(many=True, read_only=True)
     candidate_communities = CommunitySerializer(many=True, read_only=True)
+    status = serializers.CharField(source="annotation.status", read_only=True)
     status_display = serializers.SerializerMethodField()
     category = serializers.CharField(source="category.name", read_only=True)
+    locked = serializers.BooleanField(source="annotation.locked", read_only=True)
 
     def get_status_display(self, obj):
-        return obj.get_status_display()
+        annotation = getattr(obj, "annotation", None)
+        return annotation and annotation.get_status_display()
 
     class Meta:
         model = RedditCommunity
