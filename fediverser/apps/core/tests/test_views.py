@@ -1,13 +1,9 @@
-import pytest
-from django.test import Client, TestCase
+from django.test import Client
 from django.urls import resolve
 
 from fediverser.apps.core import factories
 
-
-@pytest.mark.django_db(transaction=True)
-class BaseTestCase(TestCase):
-    pass
+from .common import BaseTestCase
 
 
 class CommunityViewTestCase(BaseTestCase):

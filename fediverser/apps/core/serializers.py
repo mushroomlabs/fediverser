@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_polymorphic.serializers import PolymorphicSerializer
 
 from .models.activitypub import Community, Instance
+from .models.common import Category
 from .models.mapping import CommunityRequest
 from .models.network import (
     ChangeFeedEntry,
@@ -13,6 +14,12 @@ from .models.network import (
     RedditToCommunityRecommendationEntry,
 )
 from .models.reddit import RedditCommunity
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = read_only_fields = ("name",)
 
 
 class InstanceSerializer(serializers.ModelSerializer):
@@ -68,14 +75,24 @@ class FediversedInstanceSerializer(serializers.ModelSerializer):
 
 
 class CommunitySerializer(serializers.ModelSerializer):
+    instance = serializers.CharField(source="instance.domain", read_only=True)
+    category = serializers.CharField(source="category.name", read_only=True)
+
     class Meta:
         model = Community
         fields = ("name", "instance", "category", "url", "fqdn")
 
 
+class CommunityRecommendationSerializer(serializers.ModelSerializer):
+    community = CommunitySerializer(read_only=True)
+
+    class Meta:
+        model = RedditToCommunityRecommendationEntry
+        fields = read_only_fields = ("community",)
+
+
 class RedditCommunitySerializer(serializers.ModelSerializer):
-    recommended_communities = CommunitySerializer(many=True, read_only=True)
-    candidate_communities = CommunitySerializer(many=True, read_only=True)
+    recommended_communities = serializers.SerializerMethodField()
     status = serializers.CharField(source="annotation.status", read_only=True)
     status_display = serializers.SerializerMethodField()
     category = serializers.CharField(source="category.name", read_only=True)
@@ -84,6 +101,9 @@ class RedditCommunitySerializer(serializers.ModelSerializer):
     def get_status_display(self, obj):
         annotation = getattr(obj, "annotation", None)
         return annotation and annotation.get_status_display()
+
+    def get_recommended_communities(self, obj):
+        return [CommunitySerializer(r.community).data for r in obj.recommendations.all()]
 
     class Meta:
         model = RedditCommunity
@@ -98,7 +118,6 @@ class RedditCommunitySerializer(serializers.ModelSerializer):
             "over18",
             "full_reddit_url",
             "recommended_communities",
-            "candidate_communities",
         )
 
 
