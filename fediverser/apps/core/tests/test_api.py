@@ -15,7 +15,7 @@ class SubredditAPITestCase(APITestCase):
     def test_can_list_subreddits(self):
         factories.RedditCommunityFactory()
 
-        response = self.client.get(f"/api/subreddits")
+        response = self.client.get("/api/subreddits")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
 
