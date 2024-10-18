@@ -92,7 +92,10 @@ class CommunityRecommendationSerializer(serializers.ModelSerializer):
 
 
 class RedditCommunitySerializer(serializers.ModelSerializer):
-    recommended_communities = serializers.SerializerMethodField()
+    url = serializers.HyperlinkedIdentityField(
+        view_name="fediverser-core:api-subreddit-detail",
+        lookup_field="name",
+    )
     status = serializers.CharField(source="annotation.status", read_only=True)
     status_display = serializers.SerializerMethodField()
     category = serializers.CharField(source="category.name", read_only=True)
@@ -102,13 +105,10 @@ class RedditCommunitySerializer(serializers.ModelSerializer):
         annotation = getattr(obj, "annotation", None)
         return annotation and annotation.get_status_display()
 
-    def get_recommended_communities(self, obj):
-        return [CommunitySerializer(r.community).data for r in obj.recommendations.all()]
-
     class Meta:
         model = RedditCommunity
         read_only_fields = fields = (
-            "id",
+            "url",
             "name",
             "description",
             "category",
@@ -117,7 +117,6 @@ class RedditCommunitySerializer(serializers.ModelSerializer):
             "status_display",
             "over18",
             "full_reddit_url",
-            "recommended_communities",
         )
 
 

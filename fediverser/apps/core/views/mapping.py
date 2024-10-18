@@ -373,15 +373,6 @@ class CommunityRequestListView(generics.ListAPIView):
     ordering = ("instance__domain", "subreddit__name")
 
 
-class RedditCommunityListView(generics.ListAPIView):
-    serializer_class = serializers.RedditCommunitySerializer
-    queryset = models.RedditCommunity.objects.all()
-    filterset_class = RedditCommunityFilter
-    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    ordering = ("name",)
-    search_fields = ("name",)
-
-
 class CommunityRequestCreateView(CreateView):
     model = models.CommunityRequest
     form_class = forms.CommunityRequestForm
@@ -406,6 +397,15 @@ class CommunityRequestCreateView(CreateView):
         form.instance.requested_by = self.request.user
         form.instance.subreddit = self.get_subreddit()
         return super().form_valid(form)
+
+
+class SubredditAlternativeRecommendationListView(generics.ListAPIView):
+    serializer_class = serializers.CommunitySerializer
+    ordering = ("instance__domain", "name")
+
+    def get_queryset(self, *args, **kw):
+        subreddit = get_object_or_404(models.RedditCommunity, name=self.kwargs["name"])
+        return models.Community.objects.filter(recommendations__subreddit=subreddit)
 
 
 class InstanceRecommendationsListView(generics.ListAPIView):
@@ -485,6 +485,7 @@ __all__ = (
     "CommunityDetailView",
     "SubredditDetailView",
     "SubredditAlternativeRecommendationCreateView",
+    "SubredditAlternativeRecommendationListView",
     "SubredditCategoryRecommendationCreateView",
     "UserActionListView",
     "SubredditListView",
@@ -498,7 +499,6 @@ __all__ = (
     "CommunityListView",
     "CommunityCategoryRecommendationCreateView",
     "CommunityRequestListView",
-    "RedditCommunityListView",
     "CommunityRequestCreateView",
     "CommunityFeedCreateView",
     "subscribe_to_subreddit",

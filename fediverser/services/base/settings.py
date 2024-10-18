@@ -40,14 +40,15 @@ THIRD_PARTY_APPS = (
     "django_extensions",
     "django_filters",
     "drf_link_header_pagination",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",
     "allauth",
+    "allauth.headless",
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.reddit",
     "invitations",
     "rest_framework",
-    "rest_framework.authtoken",
-    "dj_rest_auth",
     "modelcluster",
     "taggit",
     "tree_queries",
@@ -92,7 +93,7 @@ ROOT_URLCONF = env.str("FEDIVERSER_ROOT_URLCONF", default="fediverser.services.a
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ["templates"],
+        "DIRS": [os.path.join(PROJECT_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -267,6 +268,17 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "drf_link_header_pagination.LinkHeaderPagination",
     "PAGE_SIZE": 100,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": f"{SITE_NAME} - Fediverser",
+    "DESCRIPTION": "Portal - REST API",
+    "VERSION": "0.1.0",
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
 }
 
 

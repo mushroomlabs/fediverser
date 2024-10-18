@@ -1,6 +1,9 @@
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, generics
 
-from .. import models
+from .. import models, serializers
+from ..filters import RedditCommunityFilter
 from .common import DetailView, ListView
 
 
@@ -31,6 +34,24 @@ class RedditorDetailView(DetailView):
         return get_object_or_404(self.model, username=self.kwargs["username"])
 
 
+class RedditCommunityListView(generics.ListAPIView):
+    serializer_class = serializers.RedditCommunitySerializer
+    queryset = models.RedditCommunity.objects.all()
+    filterset_class = RedditCommunityFilter
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    ordering = ("name",)
+    search_fields = ("name",)
+
+
+class RedditCommunityDetailView(generics.RetrieveAPIView):
+    serializer_class = serializers.RedditCommunitySerializer
+    queryset = models.RedditCommunity.objects.all()
+    lookup_field = "name"
+
+    def get_object(self, *args, **kw):
+        return get_object_or_404(models.RedditCommunity, name=self.kwargs["name"])
+
+
 class RedditSubmissionView(DetailView):
     model = models.RedditSubmission
     template_name = "portal/reddit_submission/detail.tmpl.html"
@@ -45,4 +66,10 @@ class RedditSubmissionView(DetailView):
         return get_object_or_404(self.model, id=self.kwargs["submission_id"])
 
 
-__all__ = ("RedditorListView", "RedditorDetailView", "RedditSubmissionView")
+__all__ = (
+    "RedditorListView",
+    "RedditorDetailView",
+    "RedditSubmissionView",
+    "RedditCommunityListView",
+    "RedditCommunityDetailView",
+)

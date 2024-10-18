@@ -12,18 +12,21 @@ class APITestCase(BaseTestCase):
 
 
 class SubredditAPITestCase(APITestCase):
-    def test_can_list_subreddits_with_recommendations(self):
-        subreddit = factories.RedditCommunityFactory()
-        community = factories.CommunityFactory()
-        factories.RedditToCommunityRecommendationFactory(subreddit=subreddit, community=community)
+    def test_can_list_subreddits(self):
+        factories.RedditCommunityFactory()
 
-        response = self.client.get("/api/subreddits")
+        response = self.client.get(f"/api/subreddits")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
 
-        subreddit_data = response.data[0]
-        recommendations = subreddit_data["recommended_communities"]
-        self.assertEqual(len(recommendations), 1)
+    def test_can_list_subreddit_recommendations(self):
+        subreddit = factories.RedditCommunityFactory(name="testing_api")
+        community = factories.CommunityFactory()
+        factories.RedditToCommunityRecommendationFactory(subreddit=subreddit, community=community)
+
+        response = self.client.get("/api/subreddits/testing_api/alternatives")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
 
 
 class ChangeFeedAPITestCase(APITestCase):

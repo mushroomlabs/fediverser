@@ -124,6 +124,16 @@ urlpatterns = [
         views.RedditCommunityListView.as_view(),
         name="api-subreddit-list",
     ),
+    path(
+        "api/subreddits/<str:name>",
+        views.RedditCommunityDetailView.as_view(),
+        name="api-subreddit-detail",
+    ),
+    path(
+        "api/subreddits/<str:name>/alternatives",
+        views.SubredditAlternativeRecommendationListView.as_view(),
+        name="api-subredditalternative-list",
+    ),
     path("api/nodeinfo", views.NodeInfoView.as_view(), name="nodeinfo-detail"),
     path(
         "api/fediverser-instances",
@@ -145,6 +155,5 @@ urlpatterns = [
         views.ChangeFeedEntryDetailView.as_view(),
         name="changefeedentry-detail",
     ),
-    path("api/auth/reddit", views.RedditAPILoginView.as_view(), name="reddit_login"),
     path("feed/changes", views.ChangeFeed(), name="changefeed-feed"),
 ]
