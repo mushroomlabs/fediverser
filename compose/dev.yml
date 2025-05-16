@@ -114,7 +114,7 @@ services:
 
   lemmy:
     <<: [*fediverser-development, *lemmy-service]
-    image: dessalines/lemmy:0.19.5
+    image: dessalines/lemmy:0.19.11
     environment:
       - RUST_LOG="warn,lemmy_server=info,lemmy_api=debug,lemmy_api_common=info,lemmy_api_crud=info,lemmy_apub=info,lemmy_db_queries=info,lemmy_db_schema=info,lemmy_db_views=info,lemmy_db_views_actor=info,lemmy_db_views_moderator=info,lemmy_routes=info,lemmy_utils=info"
     volumes:
@@ -125,7 +125,7 @@ services:
 
   lemmy-ui:
     <<: [*fediverser-development, *lemmy-service]
-    image: dessalines/lemmy-ui:0.19.5
+    image: dessalines/lemmy-ui:0.19.11
     restart: always
     environment:
       - LEMMY_UI_LEMMY_INTERNAL_HOST=lemmy:8536

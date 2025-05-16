@@ -99,7 +99,8 @@ class CommentAggregates(models.Model):
 
 
 class CommentLike(models.Model):
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("person_id", "comment_id")
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     comment = models.ForeignKey(Comment, models.DO_NOTHING)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     score = models.SmallIntegerField()
@@ -108,7 +109,6 @@ class CommentLike(models.Model):
     class Meta:
         managed = False
         db_table = "comment_like"
-        unique_together = (("person", "comment"),)
 
 
 class CommentReply(models.Model):
@@ -146,14 +146,14 @@ class CommentReport(models.Model):
 
 
 class CommentSaved(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "comment_id")
     comment = models.ForeignKey(Comment, models.DO_NOTHING)
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "comment_saved"
-        unique_together = (("person", "comment"),)
 
 
 class Community(models.Model):
@@ -178,7 +178,9 @@ class Community(models.Model):
     hidden = models.BooleanField()
     posting_restricted_to_mods = models.BooleanField()
     instance = models.ForeignKey("Instance", models.DO_NOTHING)
-    moderators_url = models.CharField(unique=True, max_length=255, blank=True, null=True)
+    moderators_url = models.CharField(
+        unique=True, max_length=255, blank=True, null=True
+    )
     featured_url = models.CharField(unique=True, max_length=255, blank=True, null=True)
     visibility = models.TextField()
 
@@ -206,59 +208,59 @@ class CommunityAggregates(models.Model):
 
 
 class CommunityBlock(models.Model):
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("person_id", "community_id")
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     community = models.ForeignKey(Community, models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "community_block"
-        unique_together = (("person", "community"),)
 
 
 class CommunityFollower(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "community_id")
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     published = models.DateTimeField()
     pending = models.BooleanField()
 
     class Meta:
         managed = False
         db_table = "community_follower"
-        unique_together = (("person", "community"),)
 
 
 class CommunityLanguage(models.Model):
-    community = models.OneToOneField(Community, models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("community_id", "language_id")
+    community = models.ForeignKey(Community, models.DO_NOTHING)
     language = models.ForeignKey("Language", models.DO_NOTHING)
 
     class Meta:
         managed = False
         db_table = "community_language"
-        unique_together = (("community", "language"),)
 
 
 class CommunityModerator(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "community_id")
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "community_moderator"
-        unique_together = (("person", "community"),)
 
 
 class CommunityPersonBan(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "community_id")
     community = models.ForeignKey(Community, models.DO_NOTHING)
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     published = models.DateTimeField()
     expires = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = "community_person_ban"
-        unique_together = (("person", "community"),)
 
 
 class CustomEmoji(models.Model):
@@ -276,13 +278,13 @@ class CustomEmoji(models.Model):
 
 
 class CustomEmojiKeyword(models.Model):
-    custom_emoji = models.OneToOneField(CustomEmoji, models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("custom_emoji_id", "keyword")
+    custom_emoji = models.ForeignKey(CustomEmoji, models.DO_NOTHING)
     keyword = models.CharField(max_length=128)
 
     class Meta:
         managed = False
         db_table = "custom_emoji_keyword"
-        unique_together = (("custom_emoji", "keyword"),)
 
 
 class EmailVerification(models.Model):
@@ -328,15 +330,15 @@ class FederationQueueState(models.Model):
         db_table = "federation_queue_state"
 
 
-class ImageUpload(models.Model):
-    local_user = models.ForeignKey("LocalUser", models.DO_NOTHING)
-    pictrs_alias = models.TextField(primary_key=True)
-    pictrs_delete_token = models.TextField()
-    published = models.DateTimeField()
+class ImageDetails(models.Model):
+    link = models.TextField(primary_key=True)
+    width = models.IntegerField()
+    height = models.IntegerField()
+    content_type = models.TextField()
 
     class Meta:
         managed = False
-        db_table = "image_upload"
+        db_table = "image_details"
 
 
 class Instance(models.Model):
@@ -355,14 +357,14 @@ class Instance(models.Model):
 
 
 class InstanceBlock(models.Model):
-    person = models.OneToOneField("Person", models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("person_id", "instance_id")
+    person = models.ForeignKey("Person", models.DO_NOTHING)
     instance = models.ForeignKey(Instance, models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "instance_block"
-        unique_together = (("person", "instance"),)
 
 
 class Language(models.Model):
@@ -378,7 +380,9 @@ class Language(models.Model):
 
 
 class LocalImage(models.Model):
-    local_user = models.ForeignKey("LocalUser", models.DO_NOTHING, blank=True, null=True)
+    local_user = models.ForeignKey(
+        "LocalUser", models.DO_NOTHING, blank=True, null=True
+    )
     pictrs_alias = models.TextField(primary_key=True)
     pictrs_delete_token = models.TextField()
     published = models.DateTimeField()
@@ -459,7 +463,7 @@ class LocalUser(models.Model):
     password_encrypted = models.TextField()
     email = models.TextField(unique=True, blank=True, null=True)
     show_nsfw = models.BooleanField(default=False)
-    theme = models.TextField(default="browser")
+    theme = models.TextField()
     default_sort_type = models.CharField(
         max_length=30,
         choices=choices.SortOrderTypes.choices,
@@ -490,9 +494,10 @@ class LocalUser(models.Model):
         default=choices.PostListingModes.LIST,
     )
     totp_2fa_enabled = models.BooleanField(default=False)
-    enable_keyboard_navigation = models.BooleanField(default=False)
+    enable_keyboard_navigation = models.BooleanField(default=True)
     enable_animated_images = models.BooleanField(default=True)
     collapse_bot_comments = models.BooleanField(default=False)
+    last_donation_notification = models.DateTimeField()
 
     def __str__(self):
         return self.person.name
@@ -503,21 +508,21 @@ class LocalUser(models.Model):
 
 
 class LocalUserLanguage(models.Model):
-    local_user = models.OneToOneField(LocalUser, models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("local_user_id", "language_id")
+    local_user = models.ForeignKey(LocalUser, models.DO_NOTHING)
     language = models.ForeignKey(Language, models.DO_NOTHING)
 
     class Meta:
         managed = False
         db_table = "local_user_language"
-        unique_together = (("local_user", "language"),)
 
 
 class LocalUserVoteDisplayMode(models.Model):
     local_user = models.OneToOneField(LocalUser, models.DO_NOTHING, primary_key=True)
-    score = models.BooleanField(default=False)
-    upvotes = models.BooleanField(default=True)
-    downvotes = models.BooleanField(default=True)
-    upvote_percentage = models.BooleanField(default=False)
+    score = models.BooleanField()
+    upvotes = models.BooleanField()
+    downvotes = models.BooleanField()
+    upvote_percentage = models.BooleanField()
 
     class Meta:
         managed = False
@@ -668,7 +673,9 @@ class ModRemovePost(models.Model):
 class ModTransferCommunity(models.Model):
     mod_person = models.ForeignKey("Person", models.DO_NOTHING)
     other_person = models.ForeignKey(
-        "Person", models.DO_NOTHING, related_name="modtransfercommunity_other_person_set"
+        "Person",
+        models.DO_NOTHING,
+        related_name="modtransfercommunity_other_person_set",
     )
     community = models.ForeignKey(Community, models.DO_NOTHING)
     when_field = models.DateTimeField(db_column="when_")
@@ -740,20 +747,23 @@ class PersonBan(models.Model):
 
 
 class PersonBlock(models.Model):
-    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
-    target = models.ForeignKey(Person, models.DO_NOTHING, related_name="personblock_target_set")
+    pk = models.CompositePrimaryKey("person_id", "target_id")
+    person = models.ForeignKey(Person, models.DO_NOTHING)
+    target = models.ForeignKey(
+        Person, models.DO_NOTHING, related_name="personblock_target_set"
+    )
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "person_block"
-        unique_together = (("person", "target"),)
 
 
 class PersonFollower(models.Model):
+    pk = models.CompositePrimaryKey("follower_id", "person_id")
     person = models.ForeignKey(Person, models.DO_NOTHING)
-    follower = models.OneToOneField(
-        Person, models.DO_NOTHING, primary_key=True, related_name="personfollower_follower_set"
+    follower = models.ForeignKey(
+        Person, models.DO_NOTHING, related_name="personfollower_follower_set"
     )
     published = models.DateTimeField()
     pending = models.BooleanField()
@@ -761,7 +771,6 @@ class PersonFollower(models.Model):
     class Meta:
         managed = False
         db_table = "person_follower"
-        unique_together = (("follower", "person"),)
 
 
 class PersonMention(models.Model):
@@ -777,7 +786,8 @@ class PersonMention(models.Model):
 
 
 class PersonPostAggregates(models.Model):
-    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("person_id", "post_id")
+    person = models.ForeignKey(Person, models.DO_NOTHING)
     post = models.ForeignKey("Post", models.DO_NOTHING)
     read_comments = models.BigIntegerField()
     published = models.DateTimeField()
@@ -785,12 +795,11 @@ class PersonPostAggregates(models.Model):
     class Meta:
         managed = False
         db_table = "person_post_aggregates"
-        unique_together = (("person", "post"),)
 
 
 class Post(models.Model):
     name = models.CharField(max_length=200)
-    url = models.CharField(max_length=512, blank=True, null=True)
+    url = models.CharField(max_length=2000, blank=True, null=True)
     body = models.TextField(blank=True, null=True)
     creator = models.ForeignKey(Person, models.DO_NOTHING)
     community = models.ForeignKey(Community, models.DO_NOTHING)
@@ -842,37 +851,37 @@ class PostAggregates(models.Model):
 
 
 class PostHide(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "post_id")
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey(Person, models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_hide"
-        unique_together = (("person", "post"),)
 
 
 class PostLike(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "post_id")
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey(Person, models.DO_NOTHING)
     score = models.SmallIntegerField()
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_like"
-        unique_together = (("person", "post"),)
 
 
 class PostRead(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "post_id")
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey(Person, models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_read"
-        unique_together = (("person", "post"),)
 
 
 class PostReport(models.Model):
@@ -884,7 +893,11 @@ class PostReport(models.Model):
     reason = models.TextField()
     resolved = models.BooleanField()
     resolver = models.ForeignKey(
-        Person, models.DO_NOTHING, related_name="postreport_resolver_set", blank=True, null=True
+        Person,
+        models.DO_NOTHING,
+        related_name="postreport_resolver_set",
+        blank=True,
+        null=True,
     )
     published = models.DateTimeField()
     updated = models.DateTimeField(blank=True, null=True)
@@ -896,14 +909,14 @@ class PostReport(models.Model):
 
 
 class PostSaved(models.Model):
+    pk = models.CompositePrimaryKey("person_id", "post_id")
     post = models.ForeignKey(Post, models.DO_NOTHING)
-    person = models.OneToOneField(Person, models.DO_NOTHING, primary_key=True)
+    person = models.ForeignKey(Person, models.DO_NOTHING)
     published = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "post_saved"
-        unique_together = (("person", "post"),)
 
 
 class PrivateMessage(models.Model):
@@ -918,6 +931,7 @@ class PrivateMessage(models.Model):
     updated = models.DateTimeField(blank=True, null=True)
     ap_id = models.CharField(unique=True, max_length=255)
     local = models.BooleanField()
+    removed = models.BooleanField()
 
     class Meta:
         managed = False
@@ -968,7 +982,7 @@ class RegistrationApplication(models.Model):
 
 
 class RemoteImage(models.Model):
-    link = models.TextField(unique=True)
+    link = models.TextField(primary_key=True)
     published = models.DateTimeField()
 
     class Meta:
@@ -1039,13 +1053,13 @@ class SiteAggregates(models.Model):
 
 
 class SiteLanguage(models.Model):
-    site = models.OneToOneField(Site, models.DO_NOTHING, primary_key=True)
+    pk = models.CompositePrimaryKey("site_id", "language_id")
+    site = models.ForeignKey(Site, models.DO_NOTHING)
     language = models.ForeignKey(Language, models.DO_NOTHING)
 
     class Meta:
         managed = False
         db_table = "site_language"
-        unique_together = (("site", "language"),)
 
 
 class Tagline(models.Model):

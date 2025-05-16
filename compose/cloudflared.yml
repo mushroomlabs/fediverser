@@ -2,26 +2,18 @@ services:
   cloudflared:
     image: cloudflare/cloudflared
     user: root:root
-    command: tunnel run fediverser-dev
+    command: tunnel run ${FEDIVERSER_CLOUDFLARED_TUNNEL_ID}
     networks:
       - default
       - internal
 
     volumes:
-      - cloudflared-credentials-data:/etc/cloudflared
-      - cloudflared-config-data:/home/nonroot/.cloudflared
+      - cloudflared-config:/root/.cloudflared
 
 volumes:
-  cloudflared-credentials-data:
+  cloudflared-config:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: "${FEDIVERSER_CLOUDFLARE_CREDENTIALS_PATH?Variable not set}"
-
-  cloudflared-config-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: "${FEDIVERSER_CLOUDFLARE_CONFIG_PATH?Variable not set}"
+      device: ${FEDIVERSER_CLOUDFLARED_CONFIG_PATH?Missing}

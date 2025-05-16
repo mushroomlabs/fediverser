@@ -42,16 +42,9 @@
      (function(document, window) {
        window.wagtailConfig = window.wagtailConfig || {};
        wagtailConfig.ADMIN_API = {}
-
-       {% i18n_enabled as i18n_enabled %}
-       {% locales as locales %}
-       wagtailConfig.I18N_ENABLED = {% if i18n_enabled %}true{% else %}false{% endif %};
-       wagtailConfig.LOCALES = {{ locales|safe }};
-       {% if locale %}
-       wagtailConfig.ACTIVE_CONTENT_LOCALE = '{{ locale.language_code }}'
-       {% endif %}
-
-       wagtailConfig.STRINGS = {% js_translation_strings %};
+       wagtailConfig.I18N_ENABLED: {{ i18n_enabled|yesno:"true,false" }},
+       wagtailConfig.LOCALES: {{ locales_json|safe }},
+       wagtailConfig.ACTIVE_CONTENT_LOCALE: '{{ locale.language_code }}',
        wagtailConfig.ADMIN_URLS = {};
      })(document, window);
     </script>
