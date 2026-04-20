@@ -4,7 +4,8 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic.base import TemplateView
 from django.views.generic.detail import DetailView as BaseDetailView
-from django.views.generic.edit import CreateView as BaseCreateView, FormView as BaseFormView
+from django.views.generic.edit import CreateView as BaseCreateView
+from django.views.generic.edit import FormView as BaseFormView
 from django.views.generic.list import ListView as BaseListView
 
 

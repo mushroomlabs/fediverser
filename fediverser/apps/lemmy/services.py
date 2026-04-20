@@ -53,9 +53,7 @@ class CommunityQuerySet(QuerySet):
 
 class InstanceProxy(models.Instance):
     def unbot(self, username):
-        models.Person.objects.filter(name=username, instance=self).update(
-            bot_account=False
-        )
+        models.Person.objects.filter(name=username, instance=self).update(bot_account=False)
 
     def register(self, username, password=None, as_bot=True):
         private_key, public_key = generate_rsa_keypair()
@@ -83,6 +81,7 @@ class InstanceProxy(models.Instance):
             defaults={
                 "password_encrypted": get_hashed_password(password),
                 "accepted_application": True,
+                "last_donation_notification": timezone.now(),
             },
         )
 
@@ -158,9 +157,7 @@ class LocalUserProxy(models.LocalUser):
         key = models.Secret.objects.values_list("jwt_secret", flat=True).first()
         login_token = jwt.encode(claims, key, algorithm="HS256")
 
-        return models.LoginToken.objects.create(
-            user=self, token=login_token, published=now
-        )
+        return models.LoginToken.objects.create(user=self, token=login_token, published=now)
 
     def make_lemmy_client(self):
         username = self.person.name

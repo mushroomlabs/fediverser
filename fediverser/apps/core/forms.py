@@ -2,7 +2,8 @@ import logging
 from urllib.parse import urlparse
 
 import requests
-from allauth.account.forms import PasswordField, SignupForm as BaseSignupForm
+from allauth.account.forms import PasswordField
+from allauth.account.forms import SignupForm as BaseSignupForm
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _

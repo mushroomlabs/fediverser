@@ -5,6 +5,8 @@ from django.views.generic.base import TemplateView
 from fediverser.apps.core.models import Person
 from fediverser.apps.lemmy.forms import (
     SetPasswordForm as LemmySetPasswordForm,
+)
+from fediverser.apps.lemmy.forms import (
     SignupForm as LemmySignupForm,
 )
 

@@ -15,6 +15,7 @@ variables:
   FEDIVERSER_SECRET_KEY: "base-fediverser-secret-key"
   LEMMY_DATABASE_ENGINE: "django.db.backends.sqlite3"
   LEMMY_DATABASE_NAME: ":memory:"
+  UV_PUBLISH_TOKEN: "${PYPI_TOKEN}"
 
 cache:
   paths:
@@ -27,7 +28,7 @@ stages:
   - release
 
 test:
-  image: python:3.12
+  image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
   stage: test
   services:
     - postgres:latest
@@ -40,34 +41,31 @@ test:
 
   script:
     - export
-    - pip install poetry
-    - poetry install
-    - poetry run pytest --nomigrations
+    - uv sync --extra dev
+    - uv run pytest --nomigrations
 
 
 build_python_package:
-  image: python:3.12
+  image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
   stage: build
 
   script:
-    - pip install poetry
-    - poetry build
+    - uv build
 
   artifacts:
     paths:
       - dist/
 
 
-publish_python_package:
-  image: python:3.12
-  stage: release
+# publish_python_package:
+#   image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+#   stage: release
 
-  script:
-    - poetry config pypi-token.pypi $PYPI_TOKEN
-    - poetry publish
+#   script:
+#     - uv publish
 
-  rules:
-    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+$/'
+#   rules:
+#     - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+$/'
 
 build_docker_image:
   image: docker:20

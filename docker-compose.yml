@@ -1,5 +1,3 @@
-version: '3.7'
-
 x-internal-service: &internal-service
   networks:
     - internal
@@ -7,7 +5,7 @@ x-internal-service: &internal-service
 x-fediverser-service: &fediverser-service
   <<: *internal-service
   image: "fediverser/app:${TAG:-latest}"
-  command: poetry run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0
+  command: uv run uvicorn fediverser.services.base.asgi:application --port 80 --host 0.0.0.0
 
   environment: &fediverser-service-environment
     DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
@@ -63,23 +61,23 @@ services:
 
   pull_reddit:
     <<: *fediverser-service
-    command: poetry run django-admin pull_from_reddit
+    command: uv run django-admin pull_from_reddit
 
   celery:
     <<: *fediverser-service
-    command: poetry run celery -A fediverser.services.base worker -l INFO -E
+    command: uv run celery -A fediverser.services.base worker -l INFO -E
 
   celerybeat:
     <<: *fediverser-service
-    command: poetry run celery -A fediverser.services.base beat -l INFO -S django
+    command: uv run celery -A fediverser.services.base beat -l INFO -S django
 
   init_migrate_db:
     <<: *fediverser-service
-    command: poetry run django-admin migrate
+    command: uv run django-admin migrate
 
   init_collect_static:
     <<: *fediverser-service
-    command: poetry run django-admin collectstatic --no-input
+    command: uv run django-admin collectstatic --no-input
 
 networks:
   internal:

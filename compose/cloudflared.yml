@@ -1,0 +1,19 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared
+    user: root:root
+    command: tunnel run ${FEDIVERSER_CLOUDFLARED_TUNNEL_ID}
+    networks:
+      - default
+      - internal
+
+    environment:
+      TUNNEL_TOKEN: ${FEDIVERSER_CLOUDFLARED_TUNNEL_TOKEN}
+
+volumes:
+  cloudflared-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${FEDIVERSER_CLOUDFLARED_CONFIG_PATH?Missing}

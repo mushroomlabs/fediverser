@@ -1,33 +1,26 @@
 # Start with a Python image.
-FROM python:3.12-slim-bookworm AS fediverser_base
-
-# Install poetry
-RUN pip install poetry
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS fediverser_base
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_CACHE_DIR='/var/cache/pypoetry'
-
-RUN apt-get update
-RUN apt-get install build-essential cargo -y
+    UV_PYTHON_DOWNLOADS=never \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
+    UV_PROJECT_ENVIRONMENT="/opt/fediverser/.venv" \
+    PATH="/opt/fediverser/.venv/bin:$PATH"
 
 WORKDIR /app
 COPY ./pyproject.toml /app
-COPY ./poetry.lock /app
-
-RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
-
-# Copy all relevant files into the image.
-COPY ./fediverser /app/fediverser
+COPY ./uv.lock /app
 COPY ./pytest.ini /app
 COPY ./README.md /app
-COPY ./setup.cfg /app/fediverse
+COPY ./fediverser /app/fediverser
 
 FROM fediverser_base AS release
-RUN poetry install --without dev
+
+RUN uv sync --frozen
 
 FROM fediverser_base AS development
-RUN poetry install
+
+RUN uv sync --frozen --extra dev

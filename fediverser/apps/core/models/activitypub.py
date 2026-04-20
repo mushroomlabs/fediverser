@@ -5,7 +5,8 @@ from django.db import models
 from pythorhead.types import LanguageType
 from requests.exceptions import ConnectionError
 
-from fediverser.apps.lemmy.models import Community as LemmyCommunity, Language
+from fediverser.apps.lemmy.models import Community as LemmyCommunity
+from fediverser.apps.lemmy.models import Language
 from fediverser.apps.lemmy.services import InstanceProxy, LocalUserProxy
 
 from .common import AP_SERVER_SOFTWARE, Category, make_http_client
