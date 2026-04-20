@@ -13,7 +13,6 @@ ENV PYTHONFAULTHANDLER=1 \
 WORKDIR /app
 COPY ./pyproject.toml /app
 COPY ./uv.lock /app
-COPY ./pytest.ini /app
 COPY ./README.md /app
 COPY ./fediverser /app/fediverser
 
