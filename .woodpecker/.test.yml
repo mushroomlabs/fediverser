@@ -2,8 +2,8 @@ steps:
   lint:
     image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
     commands:
-      - uv pip install flake8
-      - uv run --no-sync flake8
+      - uv sync --extra dev
+      - uv run ruff check
 
   test:
     image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
