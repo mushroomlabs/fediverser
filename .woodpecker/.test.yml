@@ -1,12 +1,12 @@
 steps:
   lint:
-    image: python:3.12-slim
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
     commands:
-      - pip install flake8
-      - flake8
+      - uv pip install flake8
+      - uv run --no-sync flake8
 
   test:
-    image: python:3.12-slim
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
     environment:
       DJANGO_SETTINGS_MODULE: fediverser.services.base.settings
       FEDIVERSER_ROOT_URLCONF: fediverser.services.portal.urls
@@ -27,9 +27,8 @@ steps:
     commands:
       - apt update
       - apt install build-essential cargo -y
-      - pip install poetry
-      - poetry install
-      - poetry run pytest --nomigrations
+      - uv sync --extra dev
+      - uv run pytest --nomigrations
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
