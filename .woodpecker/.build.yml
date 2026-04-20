@@ -1,6 +1,6 @@
 steps:
   publish:
-    image: woodpeckerci/plugin-docker-buildx
+    image: woodpeckerci/plugin-docker-buildx:6.0.4
     settings:
       repo: ${FEDIVERSER_DOCKER_IMAGE:-mushroomlabs/fediverser}
       platforms: linux/amd64,linux/arm64
